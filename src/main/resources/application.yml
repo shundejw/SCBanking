@@ -1,0 +1,65 @@
+spring:
+  profiles:
+    active: dev
+  ai:
+    openai:
+      # GLM coding-plan endpoint (OpenAI-compatible). Key injected via env, never hardcoded.
+      # Goal doc §5.3 names ZHIPU_API_KEY; the prior harness used SPRING_AI_API_KEY —
+      # accept either so both runbooks work.
+      api-key: "${ZHIPU_API_KEY:${SPRING_AI_API_KEY:}}"
+      base-url: "https://open.bigmodel.cn/api/coding/paas/v4/"
+      chat:
+        options:
+          model: glm-5.2
+          temperature: 0.0
+
+lcchecker:
+  # Ingestion guardrails
+  upload:
+    max-file-size-mb: 20
+    max-pages-allowed: 10
+    allowed-magic-bytes: "25504446"   # %PDF
+    max-lc-text-length-chars: 50000
+
+  # Dual-stage PDF text + OCR extraction
+  ocr:
+    confidence-threshold: 0.80
+    min-text-length-threshold: 100
+    sidecar-url: "http://localhost:8000/api/v1/ocr"
+    timeout: 30s
+    paddle:
+      url: "http://localhost:8866/predict/ocr_system"
+
+  # Spring AI structured-extraction settings (single source of truth; bridged into spring.ai.openai.*)
+  llm:
+    provider: "spring-ai"
+    model-name: "glm-5.2"
+    base-url: "https://open.bigmodel.cn/api/coding/paas/v4/"
+    api-key: "${ZHIPU_API_KEY:${SPRING_AI_API_KEY:}}"
+    temperature: 0.0
+    timeout-ms: 10000
+    prompt-template-path: "classpath:prompts/invoice-extraction-v1.st"
+
+  # Deterministic rule-engine execution order. All checks enabled.
+  rules:
+    enabled:
+      - "amount_rule"
+      - "currency_rule"
+      - "issuer_rule"
+      - "signature_rule"
+      - "applicant_rule"
+      - "address_country_rule"
+      - "goods_description_rule"
+      - "port_of_loading_rule"
+      - "port_of_discharge_rule"
+      - "lc_reference_rule"
+      # quantity_rule is intentionally NOT enabled: the fixture contract
+      # (docs/test_fixtures/expected-results.json) routes quantity mismatches through the
+      # goods-description check (UCP 600 Art. 18(c)), so an active QuantityCheck would
+      # double-count the same discrepancy in production. The check remains registered,
+      # unit-tested, and available to enable when the contract is extended.
+
+  # Intermediate-artifact store. Goal doc references /mnt/local/SCB/docs/artifacts/{runId}/;
+  # defaulting to a relative docs/artifacts keeps the same {project}/docs/artifacts layout locally.
+  artifact:
+    root-dir: "docs/artifacts"

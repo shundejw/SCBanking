@@ -1,0 +1,15 @@
+# Test profile: only the deltas over the main application.yml.
+spring:
+  ai:
+    openai:
+      # Lets the OpenAI autoconfig construct at context load; never called (LLM is mocked).
+      api-key: "test-key-not-a-real-secret"
+      base-url: "https://open.bigmodel.cn/api/coding/paas/v4/"
+      chat:
+        options:
+          model: glm-5.2
+          temperature: 0.0
+
+lcchecker:
+  artifact:
+    root-dir: "target/test-artifacts"   # keep test artifacts out of docs/
