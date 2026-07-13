@@ -2,6 +2,9 @@ package com.scb.trade.lcdocchecker.parser;
 
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.exception.InvalidMt700Exception;
+import com.scb.trade.lcdocchecker.util.FlowLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -21,6 +24,8 @@ import java.util.regex.Pattern;
  */
 @Service
 public class LcParserService {
+
+    private static final Logger log = LoggerFactory.getLogger(LcParserService.class);
 
     /** Tags that must be present on any valid MT700 (claude-code-goal.md Phase 0.2). */
     private static final List<String> MANDATORY_TAGS =
@@ -44,6 +49,9 @@ public class LcParserService {
             "(?i)(\\d+(?:\\.\\d+)?)\\s*(METRIC\\s+TONS?|MT|UNITS?|KGS?|KILOS?|KILOGRAMS?|PIECES?|PCS?|CARTONS?|BOXES?|LITRES?|LITERS?|METERS?|METRES?)");
 
     public LcTerms parse(String mt700) {
+        long startNs = System.nanoTime();
+        FlowLog.info(log, LcParserService.class, "parse",
+                "stage", "START", "inputChars", mt700 == null ? 0 : mt700.length());
         if (mt700 == null || mt700.isBlank()) {
             throw new InvalidMt700Exception("MT700 text is empty.");
         }
@@ -73,7 +81,7 @@ public class LcParserService {
         String[] applicant = splitParty(fields.get("50"));
         String[] beneficiary = splitParty(fields.get("59"));
 
-        return new LcTerms(
+        LcTerms terms = new LcTerms(
                 trimLine(fields.get("20")),
                 trimLine(fields.get("27")),
                 trimLine(fields.get("40A")),
@@ -97,6 +105,14 @@ public class LcParserService {
                 trim(fields.get("47A")),
                 trimLine(fields.get("49")),
                 extractQuantityUnit(fields.get("45A")));
+        FlowLog.info(log, LcParserService.class, "parse",
+                "stage", "END",
+                "result", "success",
+                "lcNumber", terms.lcNumber(),
+                "currency", terms.currency(),
+                "amount", terms.amount(),
+                "costMs", elapsedMs(startNs));
+        return terms;
     }
 
     /** Extract Block 4 (the text between {@code {4:} and {@code -}}) and split into tag→value. */
@@ -244,5 +260,9 @@ public class LcParserService {
             }
         }
         return "";
+    }
+
+    private static long elapsedMs(long startNs) {
+        return (System.nanoTime() - startNs) / 1_000_000L;
     }
 }

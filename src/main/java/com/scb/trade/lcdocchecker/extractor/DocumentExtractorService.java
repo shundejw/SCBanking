@@ -3,6 +3,7 @@ package com.scb.trade.lcdocchecker.extractor;
 import com.scb.trade.lcdocchecker.domain.InvoiceExtractedData;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.guard.UploadGuardService;
+import com.scb.trade.lcdocchecker.util.FlowLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -34,13 +35,33 @@ public class DocumentExtractorService {
     }
 
     public InvoiceFields extract(byte[] pdfBytes) {
+        long startNs = System.nanoTime();
+        FlowLog.info(log, DocumentExtractorService.class, "extract",
+                "stage", "START", "pdfBytes", pdfBytes.length);
+
         guard.validatePdf(pdfBytes);
         PdfTextExtractor.ExtractedPdf pdf = pdfTextExtractor.extract(pdfBytes);
         guard.enforcePageCount(pdf.pageCount());
-        log.info("Invoice text extracted ({} chars, {} pages, OCR={})",
-                pdf.text() == null ? 0 : pdf.text().length(), pdf.pageCount(), pdf.ocrUsed());
+        FlowLog.info(log, DocumentExtractorService.class, "extract",
+                "stage", "STEP",
+                "step", "extractPdfText",
+                "textChars", pdf.text() == null ? 0 : pdf.text().length(),
+                "pages", pdf.pageCount(),
+                "ocrUsed", pdf.ocrUsed());
 
         InvoiceExtractedData data = invoiceExtractionService.extract(pdf.text());
-        return data.toFields(pdf.text());
+        InvoiceFields fields = data.toFields(pdf.text());
+        FlowLog.info(log, DocumentExtractorService.class, "extract",
+                "stage", "END",
+                "result", "success",
+                "sellerName", fields.sellerName(),
+                "totalAmount", fields.totalAmount(),
+                "currency", fields.currency(),
+                "costMs", elapsedMs(startNs));
+        return fields;
+    }
+
+    private static long elapsedMs(long startNs) {
+        return (System.nanoTime() - startNs) / 1_000_000L;
     }
 }

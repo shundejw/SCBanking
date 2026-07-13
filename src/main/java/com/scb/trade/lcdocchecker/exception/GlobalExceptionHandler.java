@@ -1,6 +1,7 @@
 package com.scb.trade.lcdocchecker.exception;
 
 import com.scb.trade.lcdocchecker.domain.ErrorResponse;
+import com.scb.trade.lcdocchecker.util.FlowLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -29,34 +30,57 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidMt700Exception.class)
     public ResponseEntity<ErrorResponse> handleInvalidMt700(InvalidMt700Exception ex) {
+        FlowLog.warn(log, GlobalExceptionHandler.class, "handleInvalidMt700",
+                "stage", "ERROR",
+                "errorType", "InvalidMt700Exception",
+                "errorMessage", ex.getMessage());
         return unprocessable("Invalid MT700 format: " + ex.getMessage());
     }
 
     @ExceptionHandler(DocumentExtractionException.class)
     public ResponseEntity<ErrorResponse> handleExtraction(DocumentExtractionException ex) {
+        FlowLog.warn(log, GlobalExceptionHandler.class, "handleExtraction",
+                "stage", "ERROR",
+                "errorType", "DocumentExtractionException",
+                "errorMessage", ex.getMessage());
         return unprocessable(ex.getMessage());
     }
 
     @ExceptionHandler(UploadRejectedException.class)
     public ResponseEntity<ErrorResponse> handleUpload(UploadRejectedException ex) {
+        FlowLog.warn(log, GlobalExceptionHandler.class, "handleUpload",
+                "stage", "ERROR",
+                "errorType", "UploadRejectedException",
+                "errorMessage", ex.getMessage());
         return unprocessable(ex.getMessage());
     }
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(NotFoundException ex) {
+        FlowLog.warn(log, GlobalExceptionHandler.class, "handleNotFound",
+                "stage", "ERROR",
+                "errorType", "NotFoundException",
+                "errorMessage", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse("NOT_FOUND", ex.getMessage()));
     }
 
     @ExceptionHandler({MissingServletRequestPartException.class, MissingServletRequestParameterException.class})
     public ResponseEntity<ErrorResponse> handleMissingPart(Exception ex) {
+        FlowLog.warn(log, GlobalExceptionHandler.class, "handleMissingPart",
+                "stage", "ERROR",
+                "errorType", ex.getClass().getSimpleName(),
+                "errorMessage", ex.getMessage());
         return ResponseEntity.badRequest()
                 .body(new ErrorResponse("BAD_REQUEST", "Required request part or parameter is missing: " + ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
-        log.error("Unexpected error during check processing", ex);
+        FlowLog.error(log, GlobalExceptionHandler.class, "handleUnexpected", ex,
+                "stage", "ERROR",
+                "errorType", ex.getClass().getSimpleName(),
+                "errorMessage", ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse("INTERNAL_ERROR", "An unexpected error occurred while processing the request."));
     }

@@ -2,8 +2,11 @@ package com.scb.trade.lcdocchecker.checks;
 
 import com.scb.trade.lcdocchecker.config.RulesProperties;
 import com.scb.trade.lcdocchecker.domain.CheckResult;
+import com.scb.trade.lcdocchecker.domain.CheckStatus;
+import com.scb.trade.lcdocchecker.domain.Discrepancy;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
+import com.scb.trade.lcdocchecker.util.FlowLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,20 +49,85 @@ public class CheckEngineService {
         this.enabled = enabled;
     }
 
-    public List<CheckResult> run(LcTerms lc, InvoiceFields invoice) {
-        return checks.stream()
+    public List<CheckResult> run(String runId, LcTerms lc, InvoiceFields invoice) {
+        long startNs = System.nanoTime();
+        List<DocumentCheck> active = checks.stream()
                 .filter(c -> enabled == null || enabled.contains(c.checkId()))
-                .map(c -> executeSafely(c, lc, invoice))
                 .toList();
+        FlowLog.info(log, CheckEngineService.class, "run",
+                "stage", "START", "runId", runId, "checkCount", active.size());
+
+        List<CheckResult> results = active.stream()
+                .map(c -> executeSafely(runId, c, lc, invoice))
+                .toList();
+
+        long pass = results.stream().filter(r -> r.status() == CheckStatus.PASS).count();
+        long fail = results.stream().filter(r -> r.status() == CheckStatus.FAIL).count();
+        long unable = results.stream().filter(r -> r.status() == CheckStatus.UNABLE).count();
+        long na = results.stream().filter(r -> r.status() == CheckStatus.NOT_APPLICABLE).count();
+        FlowLog.info(log, CheckEngineService.class, "run",
+                "stage", "END",
+                "runId", runId,
+                "result", fail > 0 ? "NON_COMPLIANT" : "COMPLIANT",
+                "pass", pass,
+                "fail", fail,
+                "unable", unable,
+                "notApplicable", na,
+                "costMs", elapsedMs(startNs));
+        return results;
     }
 
-    private CheckResult executeSafely(DocumentCheck check, LcTerms lc, InvoiceFields invoice) {
+    /** Backward-compatible overload for tests that do not supply a runId. */
+    public List<CheckResult> run(LcTerms lc, InvoiceFields invoice) {
+        return run("unknown", lc, invoice);
+    }
+
+    private CheckResult executeSafely(String runId, DocumentCheck check, LcTerms lc, InvoiceFields invoice) {
         try {
-            return check.execute(lc, invoice);
+            CheckResult result = check.execute(lc, invoice);
+            logCheckResult(runId, check.checkId(), result);
+            return result;
         } catch (Exception e) {
-            log.warn("Check '{}' threw and was downgraded to UNABLE: {}", check.checkId(), e.getMessage());
+            FlowLog.warn(log, CheckEngineService.class, "executeSafely",
+                    "stage", "STEP",
+                    "runId", runId,
+                    "step", check.checkId(),
+                    "result", "UNABLE",
+                    "errorMessage", e.getMessage());
             return CheckResult.unable(check.checkId(),
                     "Check '" + check.checkId() + "' could not be completed: " + e.getMessage());
         }
+    }
+
+    private void logCheckResult(String runId, String checkId, CheckResult result) {
+        if (result.status() == CheckStatus.FAIL) {
+            Discrepancy d = result.discrepancy();
+            FlowLog.warn(log, CheckEngineService.class, "executeSafely",
+                    "stage", "STEP",
+                    "runId", runId,
+                    "step", checkId,
+                    "result", "FAIL",
+                    "field", d == null ? "unknown" : d.field(),
+                    "reason", d == null ? "discrepancy" : d.description());
+            return;
+        }
+        if (result.status() == CheckStatus.UNABLE) {
+            FlowLog.warn(log, CheckEngineService.class, "executeSafely",
+                    "stage", "STEP",
+                    "runId", runId,
+                    "step", checkId,
+                    "result", "UNABLE",
+                    "reason", result.message());
+            return;
+        }
+        FlowLog.info(log, CheckEngineService.class, "executeSafely",
+                "stage", "STEP",
+                "runId", runId,
+                "step", checkId,
+                "result", result.status().name());
+    }
+
+    private static long elapsedMs(long startNs) {
+        return (System.nanoTime() - startNs) / 1_000_000L;
     }
 }

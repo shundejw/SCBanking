@@ -4,6 +4,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.scb.trade.lcdocchecker.config.OcrProperties;
 import com.scb.trade.lcdocchecker.exception.DocumentExtractionException;
+import com.scb.trade.lcdocchecker.util.FlowLog;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
@@ -40,8 +41,6 @@ public class PaddleOcrSidecarClient implements OcrGateway {
 
     public PaddleOcrSidecarClient(OcrProperties props) {
         this.props = props;
-        // Bound connect/read timeouts so a stalled OCR sidecar degrades to a 422 instead of
-        // hanging the request thread indefinitely (requirements: "handle graceful errors").
         Duration timeout = props.timeout() == null ? Duration.ofSeconds(30) : props.timeout();
         ClientHttpRequestFactory factory = ClientHttpRequestFactoryBuilder.detect()
                 .build(HttpClientSettings.defaults().withTimeouts(timeout, timeout));
@@ -50,12 +49,15 @@ public class PaddleOcrSidecarClient implements OcrGateway {
 
     @Override
     public String extract(byte[] pdfBytes) {
+        long startNs = System.nanoTime();
         String endpoint = props.paddle() == null ? null : props.paddle().url();
         if (endpoint == null || endpoint.isBlank()) {
             throw new DocumentExtractionException("OCR sidecar URL is not configured.");
         }
         try {
             String[] images = renderPagesToBase64(pdfBytes);
+            FlowLog.info(log, PaddleOcrSidecarClient.class, "extract",
+                    "stage", "START", "pages", images.length, "endpoint", maskEndpoint(endpoint));
             String body = buildRequestBody(images);
             String response = restClient.post()
                     .uri(endpoint)
@@ -63,10 +65,21 @@ public class PaddleOcrSidecarClient implements OcrGateway {
                     .body(body)
                     .retrieve()
                     .body(String.class);
-            return parseText(response);
+            String text = parseText(response);
+            FlowLog.info(log, PaddleOcrSidecarClient.class, "extract",
+                    "stage", "END",
+                    "result", "success",
+                    "pages", images.length,
+                    "textChars", text.length(),
+                    "costMs", elapsedMs(startNs));
+            return text;
         } catch (DocumentExtractionException e) {
             throw e;
         } catch (Exception e) {
+            FlowLog.warn(log, PaddleOcrSidecarClient.class, "extract",
+                    "stage", "ERROR",
+                    "errorMessage", e.getMessage(),
+                    "costMs", elapsedMs(startNs));
             throw new DocumentExtractionException("OCR sidecar call failed: " + e.getMessage(), e);
         }
     }
@@ -126,5 +139,14 @@ public class PaddleOcrSidecarClient implements OcrGateway {
         while (it.hasNext()) {
             collect(it.next(), out);
         }
+    }
+
+    private static String maskEndpoint(String endpoint) {
+        int slash = endpoint.lastIndexOf('/');
+        return slash < 0 ? endpoint : "..." + endpoint.substring(slash);
+    }
+
+    private static long elapsedMs(long startNs) {
+        return (System.nanoTime() - startNs) / 1_000_000L;
     }
 }

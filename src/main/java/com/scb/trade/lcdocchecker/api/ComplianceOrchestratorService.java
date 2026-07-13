@@ -2,6 +2,8 @@ package com.scb.trade.lcdocchecker.api;
 
 import com.scb.trade.lcdocchecker.checks.CheckEngineService;
 import com.scb.trade.lcdocchecker.domain.CheckReport;
+import com.scb.trade.lcdocchecker.domain.CheckResult;
+import com.scb.trade.lcdocchecker.domain.CheckStatus;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.extractor.DocumentExtractorService;
@@ -10,13 +12,12 @@ import com.scb.trade.lcdocchecker.parser.LcParserService;
 import com.scb.trade.lcdocchecker.report.ReportAssemblerService;
 import com.scb.trade.lcdocchecker.store.ArtifactStoreService;
 import com.scb.trade.lcdocchecker.store.CheckRunStore;
+import com.scb.trade.lcdocchecker.util.FlowLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-
-import com.scb.trade.lcdocchecker.domain.CheckResult;
 
 /**
  * Coordinates the full pipeline for one check run and persists every intermediate artifact
@@ -58,30 +59,47 @@ public class ComplianceOrchestratorService {
     }
 
     public CheckReport process(String runId, String lcText, byte[] pdfBytes) {
-        log.info("Run {}: validating inputs", runId);
+        long startNs = System.nanoTime();
+        FlowLog.info(log, ComplianceOrchestratorService.class, "process",
+                "stage", "START", "runId", runId, "lcChars", lcText.length(), "pdfBytes", pdfBytes.length);
+
+        FlowLog.info(log, ComplianceOrchestratorService.class, "process",
+                "stage", "STEP", "runId", runId, "step", "validateInputs");
         guard.validateLcText(lcText);
         guard.validatePdf(pdfBytes);
 
-        log.info("Run {}: parsing MT700", runId);
-        LcTerms lc = parser.parse(lcText);            // InvalidMt700Exception → 422
+        FlowLog.info(log, ComplianceOrchestratorService.class, "process",
+                "stage", "STEP", "runId", runId, "step", "parseMt700");
+        LcTerms lc = parser.parse(lcText);
         artifactStore.save(runId, "lc_parsed", lc);
 
-        log.info("Run {}: extracting invoice", runId);
-        InvoiceFields invoice = extractor.extract(pdfBytes);  // DocumentExtractionException → 422
+        FlowLog.info(log, ComplianceOrchestratorService.class, "process",
+                "stage", "STEP", "runId", runId, "step", "extractInvoice");
+        InvoiceFields invoice = extractor.extract(pdfBytes);
         artifactStore.save(runId, "invoice_extracted", invoice);
         if (invoice.rawText() != null && !invoice.rawText().isBlank()) {
             artifactStore.save(runId, "pdf_text", invoice.rawText());
         }
 
-        List<CheckResult> results = engine.run(lc, invoice);
+        FlowLog.info(log, ComplianceOrchestratorService.class, "process",
+                "stage", "STEP", "runId", runId, "step", "runChecks", "lcNumber", lc.lcNumber());
+        List<CheckResult> results = engine.run(runId, lc, invoice);
         artifactStore.save(runId, "check_results", results);
 
+        FlowLog.info(log, ComplianceOrchestratorService.class, "process",
+                "stage", "STEP", "runId", runId, "step", "assembleReport");
         CheckReport report = assembler.assemble(results);
         artifactStore.save(runId, "final_report", report);
         runStore.put(runId, report);
 
-        log.info("Run {}: complete — compliant={}, discrepancies={}",
-                runId, report.compliant(), report.discrepancies().size());
+        long failCount = results.stream().filter(r -> r.status() == CheckStatus.FAIL).count();
+        FlowLog.info(log, ComplianceOrchestratorService.class, "process",
+                "stage", "END",
+                "runId", runId,
+                "result", report.compliant() ? "COMPLIANT" : "NON_COMPLIANT",
+                "discrepancies", report.discrepancies().size(),
+                "failedChecks", failCount,
+                "costMs", elapsedMs(startNs));
         return report;
     }
 
@@ -95,5 +113,9 @@ public class ComplianceOrchestratorService {
 
     public boolean runExists(String runId) {
         return runStore.get(runId).isPresent() || artifactStore.exists(runId);
+    }
+
+    private static long elapsedMs(long startNs) {
+        return (System.nanoTime() - startNs) / 1_000_000L;
     }
 }

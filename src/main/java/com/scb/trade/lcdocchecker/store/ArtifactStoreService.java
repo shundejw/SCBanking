@@ -2,6 +2,7 @@ package com.scb.trade.lcdocchecker.store;
 
 import tools.jackson.databind.ObjectMapper;
 import com.scb.trade.lcdocchecker.config.ArtifactProperties;
+import com.scb.trade.lcdocchecker.util.FlowLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -36,7 +37,11 @@ public class ArtifactStoreService {
         try {
             json = payload instanceof String s ? s : mapper.writerWithDefaultPrettyPrinter().writeValueAsString(payload);
         } catch (Exception e) {
-            log.warn("Could not serialize artifact {}/{}: {}", runId, stage, e.getMessage());
+            FlowLog.warn(log, ArtifactStoreService.class, "save",
+                    "stage", "ERROR",
+                    "runId", runId,
+                    "step", stage,
+                    "errorMessage", e.getMessage());
             return;
         }
         cache.computeIfAbsent(runId, k -> new ConcurrentHashMap<>()).put(stage, json);
@@ -45,7 +50,11 @@ public class ArtifactStoreService {
             Files.createDirectories(dir);
             Files.writeString(dir.resolve(stage + ".json"), json);
         } catch (IOException e) {
-            log.warn("Could not persist artifact {}/{} to disk: {}", runId, stage, e.getMessage());
+            FlowLog.warn(log, ArtifactStoreService.class, "save",
+                    "stage", "ERROR",
+                    "runId", runId,
+                    "step", stage,
+                    "errorMessage", e.getMessage());
         }
     }
 

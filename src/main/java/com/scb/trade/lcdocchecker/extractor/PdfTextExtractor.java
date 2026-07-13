@@ -2,6 +2,7 @@ package com.scb.trade.lcdocchecker.extractor;
 
 import com.scb.trade.lcdocchecker.config.OcrProperties;
 import com.scb.trade.lcdocchecker.exception.DocumentExtractionException;
+import com.scb.trade.lcdocchecker.util.FlowLog;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -31,6 +32,8 @@ public class PdfTextExtractor {
     }
 
     public ExtractedPdf extract(byte[] pdfBytes) {
+        FlowLog.info(log, PdfTextExtractor.class, "extract",
+                "stage", "START", "pdfBytes", pdfBytes.length);
         PDDocument doc;
         try {
             doc = Loader.loadPDF(pdfBytes);
@@ -58,14 +61,30 @@ public class PdfTextExtractor {
             }
         }
 
-        if (nonWhitespaceLength(digitalText) >= props.minTextLengthThreshold()) {
+        int digitalChars = nonWhitespaceLength(digitalText);
+        if (digitalChars >= props.minTextLengthThreshold()) {
+            FlowLog.info(log, PdfTextExtractor.class, "extract",
+                    "stage", "END",
+                    "result", "digitalText",
+                    "pages", pageCount,
+                    "textChars", digitalText.length(),
+                    "ocrUsed", false);
             return new ExtractedPdf(digitalText.trim(), pageCount, false);
         }
 
-        // Scanned / image-only PDF → OCR fallback.
-        log.info("PDF text layer insufficient ({} non-ws chars); invoking OCR fallback.", nonWhitespaceLength(digitalText));
+        FlowLog.info(log, PdfTextExtractor.class, "extract",
+                "stage", "STEP",
+                "step", "ocrFallback",
+                "digitalChars", digitalChars,
+                "threshold", props.minTextLengthThreshold());
         String ocrText = ocrGateway.extract(pdfBytes);
         if (nonWhitespaceLength(ocrText) >= props.minTextLengthThreshold()) {
+            FlowLog.info(log, PdfTextExtractor.class, "extract",
+                    "stage", "END",
+                    "result", "ocrText",
+                    "pages", pageCount,
+                    "textChars", ocrText.length(),
+                    "ocrUsed", true);
             return new ExtractedPdf(ocrText.trim(), pageCount, true);
         }
         throw new DocumentExtractionException(
