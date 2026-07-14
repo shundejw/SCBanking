@@ -93,11 +93,11 @@
           "compliant": false,
           "discrepancies": [
             {
-              "field": "totalAmount",
-              "lc_value": "Max Allowed: 60375.00",
-              "presented_value": "63000.00",
+              "field": "invoice_amount",
+              "lc_value": "USD 57,500.00",
+              "presented_value": "USD 63,000.00",
               "rule_reference": "UCP 600 Art. 18(b)",
-              "description": "The invoice amount exceeds the maximum tolerance drawing limits allowed by LC terms."
+              "description": "Invoice amount USD 63,000.00 exceeds the LC amount USD 57,500.00 and the permitted tolerance drawing limits (max allowed USD 60,375.00)."
             }
           ]
         }
@@ -118,7 +118,7 @@
           "compliant": false,
           "discrepancies": [
             {
-              "field": "goodsDescription",
+              "field": "goods_description",
               "lc_value": "100 METRIC TONS OF REFINED SUGAR\nINCOTERMS 2020 CIF HAMBURG",
               "presented_value": "100 METRIC TONS OF BROWN SUGAR, INCOTERMS 2020 CIF HAMBURG",
               "rule_reference": "UCP 600 Art. 18(c)",
@@ -143,7 +143,7 @@
           "compliant": false,
           "discrepancies": [
             {
-              "field": "goodsDescription",
+              "field": "goods_description",
               "lc_value": "100 METRIC TONS OF REFINED SUGAR\nINCOTERMS 2020 CIF HAMBURG",
               "presented_value": "80 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG",
               "rule_reference": "UCP 600 Art. 18(c)",
@@ -175,7 +175,7 @@
           "compliant": false,
           "discrepancies": [
             {
-              "field": "issuerName",
+              "field": "issuer_name",
               "lc_value": "XYZ EXPORT CO., LTD.",
               "presented_value": "ACME SUGAR TRADING LTD",
               "rule_reference": "UCP 600 Art. 18(a)(i)",
@@ -200,7 +200,7 @@
           "compliant": false,
           "discrepancies": [
             {
-              "field": "applicantName",
+              "field": "applicant_name",
               "lc_value": "ABC IMPORTERS PTE LTD",
               "presented_value": "NORDIC TRADING ASIA PTE LTD",
               "rule_reference": "UCP 600 Art. 18(a)(ii)",
@@ -225,7 +225,7 @@
           "compliant": false,
           "discrepancies": [
             {
-              "field": "portOfLoading",
+              "field": "port_of_loading",
               "lc_value": "PORT OF SINGAPORE",
               "presented_value": "Port of Shanghai",
               "rule_reference": "UCP 600 Art. 14(d)",
@@ -250,7 +250,7 @@
           "compliant": false,
           "discrepancies": [
             {
-              "field": "portOfDischarge",
+              "field": "port_of_discharge",
               "lc_value": "PORT OF HAMBURG",
               "presented_value": "Port of Rotterdam",
               "rule_reference": "UCP 600 Art. 14(d)",
@@ -300,7 +300,7 @@
           "compliant": false,
           "discrepancies": [
             {
-              "field": "lcReferenceNumber",
+              "field": "lc_reference_number",
               "lc_value": "LCDEMO2026-0002",
               "presented_value": null,
               "rule_reference": "ISBP 821 Preliminary Consideration (viii) / LC :46A",

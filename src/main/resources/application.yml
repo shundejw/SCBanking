@@ -47,7 +47,8 @@ lcchecker:
       - "signature_rule"
       - "applicant_rule"
       - "address_country_rule"
-      - "goods_description_rule"
+      # - "goods_description_rule"      # token Jaccard fallback (disabled; LLM check is default)
+      - "llm_goods_description_rule"
       - "quantity_rule"
       - "port_of_loading_rule"
       - "port_of_discharge_rule"

@@ -20,7 +20,7 @@ import java.util.Set;
 @Order(30)
 public class IssuerNameCheck implements DocumentCheck<InvoiceFields> {
 
-    static final String FIELD = "issuerName";
+    static final String FIELD = "issuer_name";
     static final String RULE = RuleReference.UCP_600_ART_18_A_I.ref();
     static final String DESCRIPTION =
             "The commercial invoice issuer name does not match the beneficiary specified in the Letter of Credit.";

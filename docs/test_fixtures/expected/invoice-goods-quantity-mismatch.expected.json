@@ -2,7 +2,7 @@
   "compliant": false,
   "discrepancies": [
     {
-      "field": "goodsDescription",
+      "field": "goods_description",
       "lc_value": "100 METRIC TONS OF REFINED SUGAR\nINCOTERMS 2020 CIF HAMBURG",
       "presented_value": "80 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG",
       "rule_reference": "UCP 600 Art. 18(c)",

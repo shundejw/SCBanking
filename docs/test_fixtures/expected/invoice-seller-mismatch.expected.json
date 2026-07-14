@@ -2,7 +2,7 @@
   "compliant": false,
   "discrepancies": [
     {
-      "field": "issuerName",
+      "field": "issuer_name",
       "lc_value": "XYZ EXPORT CO., LTD.",
       "presented_value": "ACME SUGAR TRADING LTD",
       "rule_reference": "UCP 600 Art. 18(a)(i)",

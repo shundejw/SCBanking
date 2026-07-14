@@ -23,7 +23,7 @@ import java.util.Set;
 @Order(60)
 public class GoodsDescriptionCheck implements DocumentCheck<InvoiceFields> {
 
-    static final String FIELD = "goodsDescription";
+    static final String FIELD = "goods_description";
     static final String RULE = RuleReference.UCP_600_ART_18_C.ref();
     static final String DESCRIPTION =
             "The description of goods in the commercial invoice does not correspond with that appearing in the Letter of Credit.";

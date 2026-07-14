@@ -2,7 +2,7 @@
   "compliant": false,
   "discrepancies": [
     {
-      "field": "totalAmount",
+      "field": "invoice_amount",
       "lc_value": "Max Allowed: 60375.00",
       "presented_value": "63000.00",
       "rule_reference": "UCP 600 Art. 18(b)",

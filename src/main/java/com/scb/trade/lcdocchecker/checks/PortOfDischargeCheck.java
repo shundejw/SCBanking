@@ -20,7 +20,7 @@ import java.util.Set;
 @Order(80)
 public class PortOfDischargeCheck implements DocumentCheck<InvoiceFields> {
 
-    static final String FIELD = "portOfDischarge";
+    static final String FIELD = "port_of_discharge";
     static final String RULE = RuleReference.UCP_600_ART_14_D.ref();
     static final String DESCRIPTION = "The stated discharge port conflicts with the credit.";
 

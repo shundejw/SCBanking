@@ -20,7 +20,7 @@ import java.util.Set;
 @Order(50)
 public class ApplicantNameCheck implements DocumentCheck<InvoiceFields> {
 
-    static final String FIELD = "applicantName";
+    static final String FIELD = "applicant_name";
     static final String RULE = RuleReference.UCP_600_ART_18_A_II.ref();
     static final String DESCRIPTION =
             "The commercial invoice applicant name does not correspond to the applicant specified in the Letter of Credit.";

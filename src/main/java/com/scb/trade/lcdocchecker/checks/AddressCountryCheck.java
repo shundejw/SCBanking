@@ -54,9 +54,9 @@ public class AddressCountryCheck implements DocumentCheck<InvoiceFields> {
         List<Discrepancy> found = new ArrayList<>(2);
 
         checkCountry(lc.applicantAddress(), invoice.applicantAddress(),
-                "applicantAddress", DESCRIPTION_APPLICANT, lc.applicantAddress(), invoice.applicantAddress(), found);
+                "applicant_address", DESCRIPTION_APPLICANT, lc.applicantAddress(), invoice.applicantAddress(), found);
         checkCountry(lc.beneficiaryAddress(), invoice.sellerAddress(),
-                "beneficiaryAddress", DESCRIPTION_BENEFICIARY, lc.beneficiaryAddress(), invoice.sellerAddress(), found);
+                "beneficiary_address", DESCRIPTION_BENEFICIARY, lc.beneficiaryAddress(), invoice.sellerAddress(), found);
 
         if (found.isEmpty()) {
             return CheckResult.notApplicable(checkId(), "Address countries match or invoice addresses not stated.");

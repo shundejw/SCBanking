@@ -2,7 +2,7 @@
   "compliant": false,
   "discrepancies": [
     {
-      "field": "portOfLoading",
+      "field": "port_of_loading",
       "lc_value": "PORT OF SINGAPORE",
       "presented_value": "Port of Shanghai",
       "rule_reference": "UCP 600 Art. 14(d)",

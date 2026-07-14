@@ -67,7 +67,7 @@ class RuleEngineSanityTest {
         CheckReport report = run(inv);
         assertEquals(2, report.discrepancies().size(), () -> "disc=" + report.discrepancies());
         Discrepancy goods = report.discrepancies().get(0);
-        assertEquals("goodsDescription", goods.field());
+        assertEquals("goods_description", goods.field());
         assertEquals("100 METRIC TONS OF REFINED SUGAR\nINCOTERMS 2020 CIF HAMBURG", goods.lcValue());
         assertEquals("80 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG", goods.presentedValue());
         assertEquals("UCP 600 Art. 18(c)", goods.ruleReference());
@@ -96,9 +96,9 @@ class RuleEngineSanityTest {
         assertFalse(report.compliant());
         assertEquals(1, report.discrepancies().size());
         Discrepancy d = report.discrepancies().get(0);
-        assertEquals("totalAmount", d.field());
-        assertEquals("Max Allowed: 60375.00", d.lcValue());
-        assertEquals("63000.00", d.presentedValue());
+        assertEquals("invoice_amount", d.field());
+        assertEquals("USD 57,500.00", d.lcValue());
+        assertEquals("USD 63,000.00", d.presentedValue());
         assertEquals("UCP 600 Art. 18(b)", d.ruleReference());
     }
 
@@ -108,7 +108,7 @@ class RuleEngineSanityTest {
         CheckReport report = run(inv);
         assertEquals(1, report.discrepancies().size(), () -> "disc=" + report.discrepancies());
         Discrepancy d = report.discrepancies().get(0);
-        assertEquals("issuerName", d.field());
+        assertEquals("issuer_name", d.field());
         assertEquals("XYZ EXPORT CO., LTD.", d.lcValue());
         assertEquals("ACME SUGAR TRADING LTD", d.presentedValue());
         assertEquals("UCP 600 Art. 18(a)(i)", d.ruleReference());
@@ -120,7 +120,7 @@ class RuleEngineSanityTest {
                 .goodsDescription("100 METRIC TONS OF BROWN SUGAR, INCOTERMS 2020 CIF HAMBURG")
                 .build();
         CheckReport report = run(inv);
-        Discrepancy d = assertOne(report, "goodsDescription");
+        Discrepancy d = assertOne(report, "goods_description");
         assertEquals("100 METRIC TONS OF REFINED SUGAR\nINCOTERMS 2020 CIF HAMBURG", d.lcValue());
         assertEquals("UCP 600 Art. 18(c)", d.ruleReference());
     }

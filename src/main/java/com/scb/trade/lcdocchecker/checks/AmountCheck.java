@@ -6,6 +6,7 @@ import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.rulebook.RuleReference;
+import com.scb.trade.lcdocchecker.util.MoneyFormatter;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -20,15 +21,17 @@ import java.util.Set;
  *
  * <p>Bank-practice wording: the description is objective/neutral (banks MAY accept an
  * over-amount invoice but cap honour at the credit amount) — never "non-compliant".
+ *
+ * <p>Output contract: {@code lc_value} = the LC's stated original amount, {@code presented_value}
+ * = the invoice's stated amount (both currency-formatted); the derived tolerance ceiling and
+ * explanation live in {@code description}.
  */
 @Component
 @Order(10)
 public class AmountCheck implements DocumentCheck<InvoiceFields> {
 
-    static final String FIELD = "totalAmount";
+    static final String FIELD = "invoice_amount";
     static final String RULE = RuleReference.UCP_600_ART_18_B.ref();
-    static final String DESCRIPTION =
-            "The invoice amount exceeds the maximum tolerance drawing limits allowed by LC terms.";
 
     @Override
     public String checkId() {
@@ -48,12 +51,13 @@ public class AmountCheck implements DocumentCheck<InvoiceFields> {
         BigDecimal presented = invoice.totalAmount().setScale(2, RoundingMode.HALF_UP);
         BigDecimal ceiling = lc.amountCeiling();
         if (presented.compareTo(ceiling) > 0) {
-            Discrepancy d = Discrepancy.of(
-                    FIELD,
-                    "Max Allowed: " + ceiling.toPlainString(),
-                    presented.toPlainString(),
-                    RULE,
-                    DESCRIPTION);
+            String lcValue = MoneyFormatter.format(lc.amount(), lc.currency());
+            String presentedValue = MoneyFormatter.format(presented, invoice.currency());
+            String description = "Invoice amount " + presentedValue
+                    + " exceeds the LC amount " + lcValue
+                    + " and the permitted tolerance drawing limits (max allowed "
+                    + MoneyFormatter.format(ceiling, lc.currency()) + ").";
+            Discrepancy d = Discrepancy.of(FIELD, lcValue, presentedValue, RULE, description);
             return CheckResult.fail(checkId(), d);
         }
         return CheckResult.pass(checkId());

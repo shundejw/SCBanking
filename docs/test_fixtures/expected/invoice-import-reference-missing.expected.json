@@ -2,7 +2,7 @@
   "compliant": false,
   "discrepancies": [
     {
-      "field": "lcReferenceNumber",
+      "field": "lc_reference_number",
       "lc_value": "LCDEMO2026-0002",
       "presented_value": null,
       "rule_reference": "ISBP 821 Preliminary Consideration (viii) / LC :46A",

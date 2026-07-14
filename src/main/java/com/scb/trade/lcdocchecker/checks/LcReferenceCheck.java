@@ -21,7 +21,7 @@ import java.util.Set;
 @Order(90)
 public class LcReferenceCheck implements DocumentCheck<InvoiceFields> {
 
-    static final String FIELD = "lcReferenceNumber";
+    static final String FIELD = "lc_reference_number";
     static final String RULE = RuleReference.ISBP_821_PRELIM_VIII.ref();
     static final String DESCRIPTION =
             "The LC expressly requires the documentary credit number on the commercial invoice, but it is missing.";

@@ -22,7 +22,7 @@ import java.util.Set;
 @Order(70)
 public class PortOfLoadingCheck implements DocumentCheck<InvoiceFields> {
 
-    static final String FIELD = "portOfLoading";
+    static final String FIELD = "port_of_loading";
     static final String RULE = RuleReference.UCP_600_ART_14_D.ref();
     static final String DESCRIPTION = "The stated loading port conflicts with the credit.";
 

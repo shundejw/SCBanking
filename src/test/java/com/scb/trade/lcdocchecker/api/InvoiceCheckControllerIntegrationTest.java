@@ -2,6 +2,8 @@ package com.scb.trade.lcdocchecker.api;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import com.scb.trade.lcdocchecker.checks.LlmGoodsDescriptionCheck;
+import com.scb.trade.lcdocchecker.domain.CheckResult;
 import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.extractor.InvoiceExtractionService;
@@ -53,6 +55,9 @@ class InvoiceCheckControllerIntegrationTest {
     @MockitoBean
     private OcrGateway ocrGateway;
 
+    @MockitoBean
+    private LlmGoodsDescriptionCheck llmGoodsDescriptionCheck;
+
     @BeforeEach
     void resetMocks() {
         // Boot 4.1 dropped @AutoConfigureMockMvc; build MockMvc from the wired context.
@@ -62,6 +67,13 @@ class InvoiceCheckControllerIntegrationTest {
         // The mocked InvoiceExtractionService also implements DocumentExtractor; declare its
         // document type so the dispatcher routes INVOICE documents to it.
         when(invoiceExtractionService.documentType()).thenReturn(DocumentType.INVOICE);
+        // The LLM goods-description check is mocked here — its real ChatClient call is covered
+        // by LlmGoodsDescriptionCheckTest. It degrades to UNABLE so it never produces a
+        // discrepancy that would disturb the other assertions in this integration test.
+        when(llmGoodsDescriptionCheck.checkId()).thenReturn("llm_goods_description_rule");
+        when(llmGoodsDescriptionCheck.appliesTo()).thenReturn(java.util.EnumSet.of(DocumentType.INVOICE));
+        when(llmGoodsDescriptionCheck.execute(any(), any()))
+                .thenReturn(CheckResult.unable("llm_goods_description_rule", "mocked in integration test"));
     }
 
     private String lc(String name) throws Exception {
@@ -136,9 +148,9 @@ class InvoiceCheckControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.compliant").value(false))
                 .andExpect(jsonPath("$.discrepancies.length()").value(1))
-                .andExpect(jsonPath("$.discrepancies[0].field").value("totalAmount"))
-                .andExpect(jsonPath("$.discrepancies[0].lc_value").value("Max Allowed: 60375.00"))
-                .andExpect(jsonPath("$.discrepancies[0].presented_value").value("63000.00"))
+                .andExpect(jsonPath("$.discrepancies[0].field").value("invoice_amount"))
+                .andExpect(jsonPath("$.discrepancies[0].lc_value").value("USD 57,500.00"))
+                .andExpect(jsonPath("$.discrepancies[0].presented_value").value("USD 63,000.00"))
                 .andExpect(jsonPath("$.discrepancies[0].rule_reference").value("UCP 600 Art. 18(b)"));
     }
 
