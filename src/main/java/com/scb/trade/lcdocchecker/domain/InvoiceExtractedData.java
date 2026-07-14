@@ -21,7 +21,11 @@ public record InvoiceExtractedData(
         @JsonProperty("port_of_discharge") @JsonAlias({"portOfDischarge", "destinationPort", "destination_port", "destinationLocation", "destination_location"}) String portOfDischarge,
         @JsonProperty("lc_reference_number") @JsonAlias({"lcReferenceNumber", "lcNumber", "lc_number", "importReference", "import_reference"}) String lcReferenceNumber,
         @JsonProperty("seller_address") @JsonAlias({"sellerAddress", "beneficiaryAddress", "issuer_address"}) String sellerAddress,
-        @JsonProperty("applicant_address") @JsonAlias({"applicantAddress", "buyerAddress", "buyer_address"}) String applicantAddress) {
+        @JsonProperty("applicant_address") @JsonAlias({"applicantAddress", "buyerAddress", "buyer_address"}) String applicantAddress,
+        @JsonProperty("invoice_number") @JsonAlias({"invoiceNumber", "invoice_no", "invoiceNo"}) String invoiceNumber,
+        @JsonProperty("invoice_date") @JsonAlias({"invoiceDate", "issue_date", "date"}) String invoiceDate,
+        @JsonProperty("unit_price") @JsonAlias({"unitPrice", "price_per_unit", "price"}) BigDecimal unitPrice,
+        @JsonProperty("quantity") @JsonAlias({"qty", "quantity_supplied"}) String quantity) {
 
     public InvoiceFields toFields(String rawText) {
         return InvoiceFields.builder()
@@ -35,6 +39,10 @@ public record InvoiceExtractedData(
                 .lcReferenceNumber(lcReferenceNumber)
                 .sellerAddress(sellerAddress)
                 .applicantAddress(applicantAddress)
+                .invoiceNumber(invoiceNumber)
+                .invoiceDate(invoiceDate)
+                .unitPrice(unitPrice)
+                .quantity(quantity)
                 .rawText(rawText)
                 .build();
     }

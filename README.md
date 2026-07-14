@@ -43,11 +43,11 @@ Every pipeline stage persists an intermediate artifact (`lc_parsed`, `invoice_ex
   "compliant": false,
   "discrepancies": [
     {
-      "field": "totalAmount",
-      "lc_value": "Max Allowed: 60375.00",
-      "presented_value": "63000.00",
+      "field": "invoice_amount",
+      "lc_value": "USD 57,500.00",
+      "presented_value": "USD 63,000.00",
       "rule_reference": "UCP 600 Art. 18(b)",
-      "description": "The invoice amount exceeds the maximum tolerance drawing limits allowed by LC terms."
+      "description": "Invoice amount USD 63,000.00 exceeds the LC amount USD 57,500.00 and the permitted tolerance drawing limits (max allowed USD 60,375.00)."
     }
   ]
 }
@@ -57,16 +57,18 @@ Errors return a standard `{ "error": "<CODE>", "message": "<detail>" }` body wit
 
 ## Rule Engine
 
-Deterministic, `@Order`-driven, allowlist-filtered (`lcchecker.rules.enabled`). Every discrepancy cites a UCP 600 / ISBP 821 reference sourced from a single `rulebook.RuleReference` enum (no ad-hoc citations).
+Mostly deterministic, `@Order`-driven, allowlist-filtered (`lcchecker.rules.enabled`). The goods-description check (UCP 600 Art. 18(c)) is **LLM-driven** — the case study requires checks via well-defined LLM prompts; all other checks are deterministic Java. Every discrepancy cites a UCP 600 / ISBP 821 reference sourced from a single `rulebook.RuleReference` enum (no ad-hoc citations).
+
+**Output contract** (frozen — see `docs/solution-proposal.md` §0): `field` = snake_case identifier; `lc_value` = the LC's original stated value; `presented_value` = the invoice's original stated value (amounts currency-formatted, e.g. `USD 57,500.00`); `description` = the discrepancy reason and any derived tolerance/ceiling info.
 
 | Check | Article | Behavior |
 |---|---|---|
-| Amount | UCP 600 Art. 18(b) | BigDecimal ceiling; `:39B:` NOT EXCEEDING → `tolerancePlus=0`; neutral banking wording |
+| Amount | UCP 600 Art. 18(b) | BigDecimal ceiling; `:39B:` NOT EXCEEDING → `tolerancePlus=0`; neutral banking wording. `lc_value` = LC original amount; ceiling in `description` |
 | Currency | UCP 600 Art. 18(a)(iii) | exact match; `NOT_APPLICABLE` if not extracted |
 | Issuer name | UCP 600 Art. 18(a)(i) | word-level Jaccard (≥0.85), designator-stripped, accent-folded — no substring match |
 | Applicant name | UCP 600 Art. 18(a)(ii) | same conservative matcher |
 | Address country | UCP 600 Art. 14(j) | country-only; `UNABLE` if address not stably extractable |
-| Goods description | UCP 600 Art. 18(c) | token correspondence (equal/subset/Jaccard); `NOT_APPLICABLE` if missing |
+| **Goods description** | UCP 600 Art. 18(c) | **LLM** judges correspondence via a well-defined prompt (`llm_goods_description_rule`, default); a deterministic token-Jaccard fallback (`goods_description_rule`) is registered but off by default; `UNABLE` on LLM failure |
 | Port of loading | UCP 600 Art. 14(d) | separate field; no substring-overlap as conclusive |
 | Port of discharge | UCP 600 Art. 14(d) | separate field |
 | LC reference | ISBP 821 Prelim. (viii) | conditional — only when LC `:46A:` mandates it |
@@ -78,7 +80,7 @@ Conservative by design: missing/uncertain evidence → `NOT_APPLICABLE` or `UNAB
 ## Build & Run
 
 ```bash
-# Build + run the full test suite (55 tests)
+# Build + run the full test suite (71 tests)
 mvn clean test
 
 # Run the service
@@ -104,21 +106,24 @@ Scanned PDFs with an insufficient text layer fall back to a PaddleOCR HTTP sidec
 
 ```
 src/main/java/com/scb/trade/lcdocchecker/
-├── api/            # CheckController, ComplianceOrchestratorService
-├── checks/         # DocumentCheck interface + each rule + CheckEngineService + NameNormalizer
+├── api/            # CheckController (documentType param), ComplianceOrchestratorService
+├── checks/         # DocumentCheck<D> SPI + each rule (incl. LlmGoodsDescriptionCheck) + CheckEngineService + NameNormalizer
 ├── config/         # @ConfigurationProperties (ocr, rules, upload, artifact) + SpringAiConfig
-├── domain/         # LcTerms, InvoiceFields, InvoiceExtractedData, Discrepancy, CheckResult, CheckReport, ...
+├── domain/         # LcTerms, InvoiceFields, ExtractedDocument, DocumentType, GoodsDescriptionVerdict, Discrepancy, ...
 ├── exception/      # GlobalExceptionHandler + typed exceptions
-├── extractor/      # PdfTextExtractor, PaddleOcrSidecarClient, InvoiceExtractionService (Spring AI)
+├── extractor/      # PdfTextExtractor, PaddleOcrSidecarClient, InvoiceExtractionService, DocumentExtractor<D> (Spring AI)
 ├── guard/          # UploadGuardService (magic bytes / size / pages / LC length)
 ├── parser/         # LcParserService (MT700 Block 4 state machine)
 ├── report/         # ReportAssemblerService
 ├── rulebook/       # RuleReference (single source of UCP 600 / ISBP 821 citations)
-└── store/          # ArtifactStoreService, CheckRunStore
+├── store/          # ArtifactStoreService, CheckRunStore
+└── util/           # MoneyFormatter (amount formatting only)
 src/main/resources/
 ├── application.yml
-└── prompts/invoice-extraction-v1.st
-src/test/java/...   # parser, extractor, guard, rule, manifest, controller integration tests
+└── prompts/
+    ├── invoice-extraction-v1.st
+    └── goods-description-check-v1.st
+src/test/java/...   # parser, extractor, guard, rule, manifest, controller, LLM-check tests
 ```
 
 ## Notes
