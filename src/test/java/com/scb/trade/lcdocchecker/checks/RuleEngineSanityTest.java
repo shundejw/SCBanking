@@ -26,8 +26,8 @@ class RuleEngineSanityTest {
     private final CheckEngineService engine = new CheckEngineService(allChecks());
     private final ReportAssemblerService assembler = new ReportAssemblerService();
 
-    private static List<DocumentCheck> allChecks() {
-        return List.of(
+    private static List<DocumentCheck<?>> allChecks() {
+        return List.<DocumentCheck<?>>of(
                 new AmountCheck(),
                 new CurrencyCheck(),
                 new IssuerNameCheck(),

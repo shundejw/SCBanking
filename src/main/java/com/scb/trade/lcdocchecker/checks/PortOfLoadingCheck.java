@@ -2,11 +2,15 @@ package com.scb.trade.lcdocchecker.checks;
 
 import com.scb.trade.lcdocchecker.domain.CheckResult;
 import com.scb.trade.lcdocchecker.domain.Discrepancy;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.rulebook.RuleReference;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * UCP 600 Art. 14(d) — data in the invoice must not conflict with the credit. Compares the
@@ -16,7 +20,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Order(70)
-public class PortOfLoadingCheck implements DocumentCheck {
+public class PortOfLoadingCheck implements DocumentCheck<InvoiceFields> {
 
     static final String FIELD = "portOfLoading";
     static final String RULE = RuleReference.UCP_600_ART_14_D.ref();
@@ -25,6 +29,11 @@ public class PortOfLoadingCheck implements DocumentCheck {
     @Override
     public String checkId() {
         return "port_of_loading_rule";
+    }
+
+    @Override
+    public Set<DocumentType> appliesTo() {
+        return EnumSet.of(DocumentType.INVOICE);
     }
 
     @Override

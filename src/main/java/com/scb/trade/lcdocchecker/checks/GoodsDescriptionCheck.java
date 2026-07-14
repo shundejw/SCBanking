@@ -2,12 +2,14 @@ package com.scb.trade.lcdocchecker.checks;
 
 import com.scb.trade.lcdocchecker.domain.CheckResult;
 import com.scb.trade.lcdocchecker.domain.Discrepancy;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.rulebook.RuleReference;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.util.EnumSet;
 import java.util.Set;
 
 /**
@@ -19,7 +21,7 @@ import java.util.Set;
  */
 @Component
 @Order(60)
-public class GoodsDescriptionCheck implements DocumentCheck {
+public class GoodsDescriptionCheck implements DocumentCheck<InvoiceFields> {
 
     static final String FIELD = "goodsDescription";
     static final String RULE = RuleReference.UCP_600_ART_18_C.ref();
@@ -31,6 +33,11 @@ public class GoodsDescriptionCheck implements DocumentCheck {
     @Override
     public String checkId() {
         return "goods_description_rule";
+    }
+
+    @Override
+    public Set<DocumentType> appliesTo() {
+        return EnumSet.of(DocumentType.INVOICE);
     }
 
     @Override

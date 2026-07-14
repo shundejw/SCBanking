@@ -2,11 +2,15 @@ package com.scb.trade.lcdocchecker.checks;
 
 import com.scb.trade.lcdocchecker.domain.CheckResult;
 import com.scb.trade.lcdocchecker.domain.Discrepancy;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.rulebook.RuleReference;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * UCP 600 Art. 14(d) — port of discharge comparison (LC {@code :44F:} vs invoice). Reported
@@ -14,7 +18,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Order(80)
-public class PortOfDischargeCheck implements DocumentCheck {
+public class PortOfDischargeCheck implements DocumentCheck<InvoiceFields> {
 
     static final String FIELD = "portOfDischarge";
     static final String RULE = RuleReference.UCP_600_ART_14_D.ref();
@@ -23,6 +27,11 @@ public class PortOfDischargeCheck implements DocumentCheck {
     @Override
     public String checkId() {
         return "port_of_discharge_rule";
+    }
+
+    @Override
+    public Set<DocumentType> appliesTo() {
+        return EnumSet.of(DocumentType.INVOICE);
     }
 
     @Override

@@ -2,11 +2,15 @@ package com.scb.trade.lcdocchecker.checks;
 
 import com.scb.trade.lcdocchecker.domain.CheckResult;
 import com.scb.trade.lcdocchecker.domain.Discrepancy;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.rulebook.RuleReference;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * ISBP 821 Preliminary Consideration (viii) — an absent/mistyped LC reference is NOT a
@@ -15,7 +19,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Order(90)
-public class LcReferenceCheck implements DocumentCheck {
+public class LcReferenceCheck implements DocumentCheck<InvoiceFields> {
 
     static final String FIELD = "lcReferenceNumber";
     static final String RULE = RuleReference.ISBP_821_PRELIM_VIII.ref();
@@ -25,6 +29,11 @@ public class LcReferenceCheck implements DocumentCheck {
     @Override
     public String checkId() {
         return "lc_reference_rule";
+    }
+
+    @Override
+    public Set<DocumentType> appliesTo() {
+        return EnumSet.of(DocumentType.INVOICE);
     }
 
     @Override

@@ -4,7 +4,8 @@ import com.scb.trade.lcdocchecker.checks.CheckEngineService;
 import com.scb.trade.lcdocchecker.domain.CheckReport;
 import com.scb.trade.lcdocchecker.domain.CheckResult;
 import com.scb.trade.lcdocchecker.domain.CheckStatus;
-import com.scb.trade.lcdocchecker.domain.InvoiceFields;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
+import com.scb.trade.lcdocchecker.domain.ExtractedDocument;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.extractor.DocumentExtractorService;
 import com.scb.trade.lcdocchecker.guard.UploadGuardService;
@@ -24,7 +25,7 @@ import java.util.List;
  * for inspection:
  *
  * <pre>
- *   guard → parse LC → extract invoice → run checks → assemble report
+ *   guard → parse LC → extract document → run checks → assemble report
  * </pre>
  *
  * Each stage is stored under {@code <rootDir>/<runId>/<stage>.json}.
@@ -58,10 +59,11 @@ public class ComplianceOrchestratorService {
         this.runStore = runStore;
     }
 
-    public CheckReport process(String runId, String lcText, byte[] pdfBytes) {
+    public CheckReport process(String runId, String lcText, byte[] pdfBytes, DocumentType documentType) {
         long startNs = System.nanoTime();
         FlowLog.info(log, ComplianceOrchestratorService.class, "process",
-                "stage", "START", "runId", runId, "lcChars", lcText.length(), "pdfBytes", pdfBytes.length);
+                "stage", "START", "runId", runId,
+                "lcChars", lcText.length(), "pdfBytes", pdfBytes.length, "documentType", documentType);
 
         FlowLog.info(log, ComplianceOrchestratorService.class, "process",
                 "stage", "STEP", "runId", runId, "step", "validateInputs");
@@ -74,16 +76,16 @@ public class ComplianceOrchestratorService {
         artifactStore.save(runId, "lc_parsed", lc);
 
         FlowLog.info(log, ComplianceOrchestratorService.class, "process",
-                "stage", "STEP", "runId", runId, "step", "extractInvoice");
-        InvoiceFields invoice = extractor.extract(pdfBytes);
-        artifactStore.save(runId, "invoice_extracted", invoice);
-        if (invoice.rawText() != null && !invoice.rawText().isBlank()) {
-            artifactStore.save(runId, "pdf_text", invoice.rawText());
+                "stage", "STEP", "runId", runId, "step", "extractDocument", "documentType", documentType);
+        ExtractedDocument doc = extractor.extract(pdfBytes, documentType);
+        artifactStore.save(runId, documentType.name().toLowerCase() + "_extracted", doc);
+        if (doc.rawText() != null && !doc.rawText().isBlank()) {
+            artifactStore.save(runId, "pdf_text", doc.rawText());
         }
 
         FlowLog.info(log, ComplianceOrchestratorService.class, "process",
                 "stage", "STEP", "runId", runId, "step", "runChecks", "lcNumber", lc.lcNumber());
-        List<CheckResult> results = engine.run(runId, lc, invoice);
+        List<CheckResult> results = engine.run(runId, lc, doc);
         artifactStore.save(runId, "check_results", results);
 
         FlowLog.info(log, ComplianceOrchestratorService.class, "process",

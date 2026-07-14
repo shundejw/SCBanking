@@ -107,8 +107,8 @@ class ExpectedResultsManifestTest {
                 .lcReferenceNumber(null);
     }
 
-    private static List<DocumentCheck> allChecks() {
-        return List.of(
+    private static List<DocumentCheck<?>> allChecks() {
+        return List.<DocumentCheck<?>>of(
                 new AmountCheck(),
                 new CurrencyCheck(),
                 new IssuerNameCheck(),

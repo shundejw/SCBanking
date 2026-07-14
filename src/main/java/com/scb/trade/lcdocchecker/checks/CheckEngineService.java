@@ -4,7 +4,8 @@ import com.scb.trade.lcdocchecker.config.RulesProperties;
 import com.scb.trade.lcdocchecker.domain.CheckResult;
 import com.scb.trade.lcdocchecker.domain.CheckStatus;
 import com.scb.trade.lcdocchecker.domain.Discrepancy;
-import com.scb.trade.lcdocchecker.domain.InvoiceFields;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
+import com.scb.trade.lcdocchecker.domain.ExtractedDocument;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.util.FlowLog;
 import org.slf4j.Logger;
@@ -16,53 +17,50 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Runs the registered {@link DocumentCheck} beans in their deterministic Spring {@code @Order}
- * (amount, currency, issuer, signature, applicant, goods, port-of-loading, port-of-discharge,
- * lc-reference), filtered by the {@code lcchecker.rules.enabled} allowlist.
+ * Runs the registered {@link DocumentCheck} beans in their deterministic Spring {@code @Order},
+ * filtered by document-type applicability ({@link DocumentCheck#appliesTo()}) and the
+ * {@code lcchecker.rules} allowlist.
  *
- * <p>A check that throws degrades to {@link com.scb.trade.lcdocchecker.domain.CheckStatus#UNABLE}
- * rather than crashing the run (rules.md §5.1: no silent pass, but loud downgrade).
+ * <p>A check that throws degrades to {@link CheckStatus#UNABLE} rather than crashing the run
+ * (no silent pass, but loud downgrade).
  */
 @Service
 public class CheckEngineService {
 
     private static final Logger log = LoggerFactory.getLogger(CheckEngineService.class);
 
-    private final List<DocumentCheck> checks;
-    private final Set<String> enabled;
+    private final List<DocumentCheck<?>> checks;
+    private final RulesProperties rulesProperties;
 
     @Autowired
-    public CheckEngineService(List<DocumentCheck> checks, RulesProperties rulesProperties) {
-        this(checks,
-                rulesProperties == null || rulesProperties.enabled() == null || rulesProperties.enabled().isEmpty()
-                        ? null : Set.copyOf(rulesProperties.enabled()));
-    }
-
-    /** Convenience constructor: ALL registered checks active (no allowlist). */
-    public CheckEngineService(List<DocumentCheck> checks) {
-        this(checks, (Set<String>) null);
-    }
-
-    /** Test-friendly constructor: {@code enabled == null} means all checks active. */
-    public CheckEngineService(List<DocumentCheck> checks, Set<String> enabled) {
+    public CheckEngineService(List<DocumentCheck<?>> checks, RulesProperties rulesProperties) {
         this.checks = checks;
-        this.enabled = enabled;
+        this.rulesProperties = rulesProperties;
     }
 
-    public List<CheckResult> run(String runId, LcTerms lc, InvoiceFields invoice) {
+    /** Convenience constructor: ALL registered checks active (no allowlist). Test-friendly. */
+    public CheckEngineService(List<DocumentCheck<?>> checks) {
+        this(checks, null);
+    }
+
+    public List<CheckResult> run(String runId, LcTerms lc, ExtractedDocument doc) {
         long startNs = System.nanoTime();
-        List<DocumentCheck> active = checks.stream()
+        DocumentType type = doc.documentType();
+        Set<String> enabled = rulesProperties == null ? null : rulesProperties.resolve(type);
+        List<DocumentCheck<?>> active = checks.stream()
+                .filter(c -> c.appliesTo().contains(type))
                 .filter(c -> enabled == null || enabled.contains(c.checkId()))
                 .toList();
         FlowLog.info(log, CheckEngineService.class, "run",
                 "stage", "START",
                 "runId", runId,
+                "documentType", type,
                 "checkCount", active.size(),
                 "input.lc", FlowLog.prettyValue(lc),
-                "input.invoice", FlowLog.prettyValue(invoice));
+                "input.document", FlowLog.prettyValue(doc));
 
         List<CheckResult> results = active.stream()
-                .map(c -> executeSafely(runId, c, lc, invoice))
+                .map(c -> executeSafely(runId, c, lc, doc))
                 .toList();
 
         long pass = results.stream().filter(r -> r.status() == CheckStatus.PASS).count();
@@ -72,6 +70,7 @@ public class CheckEngineService {
         FlowLog.info(log, CheckEngineService.class, "run",
                 "stage", "END",
                 "runId", runId,
+                "documentType", type,
                 "result", fail > 0 ? "NON_COMPLIANT" : "COMPLIANT",
                 "pass", pass,
                 "fail", fail,
@@ -83,18 +82,19 @@ public class CheckEngineService {
     }
 
     /** Backward-compatible overload for tests that do not supply a runId. */
-    public List<CheckResult> run(LcTerms lc, InvoiceFields invoice) {
-        return run("unknown", lc, invoice);
+    public List<CheckResult> run(LcTerms lc, ExtractedDocument doc) {
+        return run("unknown", lc, doc);
     }
 
-    private CheckResult executeSafely(String runId, DocumentCheck check, LcTerms lc, InvoiceFields invoice) {
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private CheckResult executeSafely(String runId, DocumentCheck check, LcTerms lc, ExtractedDocument doc) {
         FlowLog.info(log, CheckEngineService.class, "executeSafely",
                 "stage", "STEP",
                 "runId", runId,
                 "step", check.checkId(),
-                "input", FlowLog.prettyValue(stepInputSummary(lc, invoice)));
+                "input", FlowLog.prettyValue(stepInputSummary(lc, doc)));
         try {
-            CheckResult result = check.execute(lc, invoice);
+            CheckResult result = check.execute(lc, doc);
             logCheckResult(runId, check.checkId(), result);
             return result;
         } catch (Exception e) {
@@ -140,7 +140,7 @@ public class CheckEngineService {
                 "output", FlowLog.prettyValue(result));
     }
 
-    private String stepInputSummary(LcTerms lc, InvoiceFields invoice) {
+    private String stepInputSummary(LcTerms lc, ExtractedDocument doc) {
         return "LcTerms{"
                 + "lcNumber=" + lc.lcNumber()
                 + ", currency=" + lc.currency()
@@ -151,15 +151,9 @@ public class CheckEngineService {
                 + ", portOfDischarge=" + lc.portOfDischarge()
                 + ", goodsDescription=" + lc.goodsDescription()
                 + "}\n"
-                + "InvoiceFields{"
-                + "sellerName=" + invoice.sellerName()
-                + ", applicantName=" + invoice.applicantName()
-                + ", currency=" + invoice.currency()
-                + ", totalAmount=" + invoice.totalAmount()
-                + ", portOfLoading=" + invoice.portOfLoading()
-                + ", portOfDischarge=" + invoice.portOfDischarge()
-                + ", lcReferenceNumber=" + invoice.lcReferenceNumber()
-                + ", goodsDescription=" + invoice.goodsDescription()
+                + doc.getClass().getSimpleName() + "{"
+                + "documentType=" + doc.documentType()
+                + ", rawTextChars=" + (doc.rawText() == null ? 0 : doc.rawText().length())
                 + "}";
     }
 

@@ -2,6 +2,7 @@ package com.scb.trade.lcdocchecker.checks;
 
 import com.scb.trade.lcdocchecker.domain.CheckResult;
 import com.scb.trade.lcdocchecker.domain.Discrepancy;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.rulebook.RuleReference;
@@ -10,6 +11,8 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * UCP 600 Art. 18(b) — the invoice must not be drawn for more than the permitted credit
@@ -20,7 +23,7 @@ import java.math.RoundingMode;
  */
 @Component
 @Order(10)
-public class AmountCheck implements DocumentCheck {
+public class AmountCheck implements DocumentCheck<InvoiceFields> {
 
     static final String FIELD = "totalAmount";
     static final String RULE = RuleReference.UCP_600_ART_18_B.ref();
@@ -30,6 +33,11 @@ public class AmountCheck implements DocumentCheck {
     @Override
     public String checkId() {
         return "amount_rule";
+    }
+
+    @Override
+    public Set<DocumentType> appliesTo() {
+        return EnumSet.of(DocumentType.INVOICE);
     }
 
     @Override

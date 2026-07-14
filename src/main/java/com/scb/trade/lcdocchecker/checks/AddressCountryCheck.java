@@ -2,6 +2,7 @@ package com.scb.trade.lcdocchecker.checks;
 
 import com.scb.trade.lcdocchecker.domain.CheckResult;
 import com.scb.trade.lcdocchecker.domain.Discrepancy;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.rulebook.RuleReference;
@@ -9,7 +10,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * UCP 600 Art. 14(j) — applicant and beneficiary addresses need not match exactly, but the
@@ -25,7 +28,7 @@ import java.util.List;
  */
 @Component
 @Order(55)
-public class AddressCountryCheck implements DocumentCheck {
+public class AddressCountryCheck implements DocumentCheck<InvoiceFields> {
 
     static final String RULE = RuleReference.UCP_600_ART_14_J.ref();
     static final String DESCRIPTION_APPLICANT =
@@ -36,6 +39,11 @@ public class AddressCountryCheck implements DocumentCheck {
     @Override
     public String checkId() {
         return "address_country_rule";
+    }
+
+    @Override
+    public Set<DocumentType> appliesTo() {
+        return EnumSet.of(DocumentType.INVOICE);
     }
 
     @Override

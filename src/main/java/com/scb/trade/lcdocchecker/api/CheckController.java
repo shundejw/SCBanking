@@ -1,6 +1,7 @@
 package com.scb.trade.lcdocchecker.api;
 
 import com.scb.trade.lcdocchecker.domain.CheckReport;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.exception.NotFoundException;
 import com.scb.trade.lcdocchecker.util.FlowLog;
 import org.slf4j.Logger;
@@ -23,10 +24,12 @@ import java.util.UUID;
  * REST API for LC ↔ invoice document checking.
  *
  * <ul>
- *   <li>{@code POST /checks} — multipart: {@code lc} (raw MT700 text) + {@code invoice} (PDF).</li>
+ *   <li>{@code POST /checks} — multipart: {@code lc} (raw MT700 text) + {@code invoice} (PDF),
+ *       with an optional {@code documentType} query param (default {@code INVOICE}).</li>
  *   <li>{@code GET /checks/{runId}} — final compliance report.</li>
  *   <li>{@code GET /checks/{runId}/artifacts/{stage}} — intermediate artifact JSON
- *       (lc_parsed, invoice_extracted, pdf_text, check_results, final_report).</li>
+ *       (lc_parsed, {@code <documentType>_extracted} e.g. invoice_extracted, pdf_text,
+ *       check_results, final_report).</li>
  * </ul>
  */
 @RestController
@@ -44,7 +47,8 @@ public class CheckController {
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CheckReport> check(
             @RequestParam("lc") String lcText,
-            @RequestPart("invoice") MultipartFile invoice) throws IOException {
+            @RequestPart("invoice") MultipartFile invoice,
+            @RequestParam(name = "documentType", defaultValue = "INVOICE") DocumentType documentType) throws IOException {
         String runId = UUID.randomUUID().toString();
         String fileName = invoice.getOriginalFilename() == null ? "unknown.pdf" : invoice.getOriginalFilename();
         long startNs = System.nanoTime();
@@ -53,8 +57,9 @@ public class CheckController {
                 "runId", runId,
                 "fileName", fileName,
                 "lcChars", lcText == null ? 0 : lcText.length(),
-                "pdfBytes", invoice.getSize());
-        CheckReport report = orchestrator.process(runId, lcText, invoice.getBytes());
+                "pdfBytes", invoice.getSize(),
+                "documentType", documentType);
+        CheckReport report = orchestrator.process(runId, lcText, invoice.getBytes(), documentType);
         FlowLog.info(log, CheckController.class, "check",
                 "stage", "END",
                 "runId", runId,

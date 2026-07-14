@@ -17,7 +17,12 @@ public record InvoiceFields(
         String lcReferenceNumber,  // optional — null when the invoice does not state it
         String sellerAddress,      // optional — used by the address-country check
         String applicantAddress,   // optional — used by the address-country check
-        String rawText) {          // raw extracted text (for artifacts)
+        String rawText) implements ExtractedDocument {          // raw extracted text (for artifacts)
+
+    @Override
+    public DocumentType documentType() {
+        return DocumentType.INVOICE;
+    }
 
     public static Builder builder() {
         return new Builder();

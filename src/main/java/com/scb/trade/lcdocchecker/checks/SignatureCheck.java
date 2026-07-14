@@ -1,10 +1,14 @@
 package com.scb.trade.lcdocchecker.checks;
 
 import com.scb.trade.lcdocchecker.domain.CheckResult;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * SIGNATURE_RULE — scans {@code :46A:}/{@code :47A:} for a signature requirement (e.g.
@@ -15,11 +19,16 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Order(40)
-public class SignatureCheck implements DocumentCheck {
+public class SignatureCheck implements DocumentCheck<InvoiceFields> {
 
     @Override
     public String checkId() {
         return "signature_rule";
+    }
+
+    @Override
+    public Set<DocumentType> appliesTo() {
+        return EnumSet.of(DocumentType.INVOICE);
     }
 
     @Override

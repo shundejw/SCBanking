@@ -2,18 +2,22 @@ package com.scb.trade.lcdocchecker.checks;
 
 import com.scb.trade.lcdocchecker.domain.CheckResult;
 import com.scb.trade.lcdocchecker.domain.Discrepancy;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.rulebook.RuleReference;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 /**
  * UCP 600 Art. 18(a)(iii) — the invoice currency must be identical to the credit currency.
  */
 @Component
 @Order(20)
-public class CurrencyCheck implements DocumentCheck {
+public class CurrencyCheck implements DocumentCheck<InvoiceFields> {
 
     static final String FIELD = "currency";
     static final String RULE = RuleReference.UCP_600_ART_18_A_III.ref();
@@ -22,6 +26,11 @@ public class CurrencyCheck implements DocumentCheck {
     @Override
     public String checkId() {
         return "currency_rule";
+    }
+
+    @Override
+    public Set<DocumentType> appliesTo() {
+        return EnumSet.of(DocumentType.INVOICE);
     }
 
     @Override

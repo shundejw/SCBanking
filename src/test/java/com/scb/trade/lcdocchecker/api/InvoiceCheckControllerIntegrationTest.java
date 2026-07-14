@@ -2,7 +2,8 @@ package com.scb.trade.lcdocchecker.api;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import com.scb.trade.lcdocchecker.domain.InvoiceExtractedData;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
+import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.extractor.InvoiceExtractionService;
 import com.scb.trade.lcdocchecker.extractor.OcrGateway;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +59,9 @@ class InvoiceCheckControllerIntegrationTest {
         this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
         // default: OCR returns rich text if ever invoked; individual tests override.
         when(ocrGateway.extract(any())).thenReturn("".repeat(0));
+        // The mocked InvoiceExtractionService also implements DocumentExtractor; declare its
+        // document type so the dispatcher routes INVOICE documents to it.
+        when(invoiceExtractionService.documentType()).thenReturn(DocumentType.INVOICE);
     }
 
     private String lc(String name) throws Exception {
@@ -72,11 +76,17 @@ class InvoiceCheckControllerIntegrationTest {
         return new MockMultipartFile("invoice", filename, "application/pdf", invoice(filename));
     }
 
-    private InvoiceExtractedData mainCompliant() {
-        return new InvoiceExtractedData("XYZ EXPORT CO., LTD.", "ABC IMPORTERS PTE LTD", "USD",
-                new BigDecimal("57500.00"),
-                "100 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG",
-                "Port of Singapore", "Port of Hamburg", "LC202607120001", null, null);
+    private InvoiceFields mainCompliant() {
+        return InvoiceFields.builder()
+                .sellerName("XYZ EXPORT CO., LTD.")
+                .applicantName("ABC IMPORTERS PTE LTD")
+                .currency("USD")
+                .totalAmount(new BigDecimal("57500.00"))
+                .goodsDescription("100 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG")
+                .portOfLoading("Port of Singapore")
+                .portOfDischarge("Port of Hamburg")
+                .lcReferenceNumber("LC202607120001")
+                .build();
     }
 
     @Test
@@ -108,10 +118,16 @@ class InvoiceCheckControllerIntegrationTest {
 
     @Test
     void amountExceedsReturns200WithTotalAmountDiscrepancy() throws Exception {
-        InvoiceExtractedData over = new InvoiceExtractedData("XYZ EXPORT CO., LTD.", "ABC IMPORTERS PTE LTD",
-                "USD", new BigDecimal("63000.00"),
-                "100 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG",
-                "Port of Singapore", "Port of Hamburg", "LC202607120001", null, null);
+        InvoiceFields over = InvoiceFields.builder()
+                .sellerName("XYZ EXPORT CO., LTD.")
+                .applicantName("ABC IMPORTERS PTE LTD")
+                .currency("USD")
+                .totalAmount(new BigDecimal("63000.00"))
+                .goodsDescription("100 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG")
+                .portOfLoading("Port of Singapore")
+                .portOfDischarge("Port of Hamburg")
+                .lcReferenceNumber("LC202607120001")
+                .build();
         when(invoiceExtractionService.extract(anyString())).thenReturn(over);
 
         mockMvc.perform(multipart("/checks")
