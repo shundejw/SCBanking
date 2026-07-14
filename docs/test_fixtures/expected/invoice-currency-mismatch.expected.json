@@ -1,0 +1,12 @@
+{
+  "compliant": false,
+  "discrepancies": [
+    {
+      "field": "currency",
+      "lc_value": "USD",
+      "presented_value": "EUR",
+      "rule_reference": "UCP 600 Art. 18(a)(iii)",
+      "description": "Currency mismatch: Invoice currency must be identical to LC currency."
+    }
+  ]
+}

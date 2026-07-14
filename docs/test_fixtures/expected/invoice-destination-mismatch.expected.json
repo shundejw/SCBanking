@@ -1,0 +1,12 @@
+{
+  "compliant": false,
+  "discrepancies": [
+    {
+      "field": "portOfDischarge",
+      "lc_value": "PORT OF HAMBURG",
+      "presented_value": "Port of Rotterdam",
+      "rule_reference": "UCP 600 Art. 14(d)",
+      "description": "The stated discharge port conflicts with the credit."
+    }
+  ]
+}

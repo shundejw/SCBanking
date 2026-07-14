@@ -1,0 +1,19 @@
+{
+  "compliant": false,
+  "discrepancies": [
+    {
+      "field": "goodsDescription",
+      "lc_value": "100 METRIC TONS OF REFINED SUGAR\nINCOTERMS 2020 CIF HAMBURG",
+      "presented_value": "80 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG",
+      "rule_reference": "UCP 600 Art. 18(c)",
+      "description": "The description of goods in the commercial invoice does not correspond with that appearing in the Letter of Credit."
+    },
+    {
+      "field": "quantity",
+      "lc_value": "100 METRIC TONS",
+      "presented_value": "80 METRIC TONS",
+      "rule_reference": "UCP 600 Art. 30(b)",
+      "description": "The presented quantity does not fall within the tolerance permitted by the LC terms."
+    }
+  ]
+}

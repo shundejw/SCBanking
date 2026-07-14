@@ -1,0 +1,12 @@
+{
+  "compliant": false,
+  "discrepancies": [
+    {
+      "field": "totalAmount",
+      "lc_value": "Max Allowed: 60375.00",
+      "presented_value": "63000.00",
+      "rule_reference": "UCP 600 Art. 18(b)",
+      "description": "The invoice amount exceeds the maximum tolerance drawing limits allowed by LC terms."
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "compliant": false,
+  "discrepancies": [
+    {
+      "field": "applicantName",
+      "lc_value": "ABC IMPORTERS PTE LTD",
+      "presented_value": "NORDIC TRADING ASIA PTE LTD",
+      "rule_reference": "UCP 600 Art. 18(a)(ii)",
+      "description": "The commercial invoice applicant name does not correspond to the applicant specified in the Letter of Credit."
+    }
+  ]
+}

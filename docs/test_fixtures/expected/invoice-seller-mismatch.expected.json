@@ -1,0 +1,12 @@
+{
+  "compliant": false,
+  "discrepancies": [
+    {
+      "field": "issuerName",
+      "lc_value": "XYZ EXPORT CO., LTD.",
+      "presented_value": "ACME SUGAR TRADING LTD",
+      "rule_reference": "UCP 600 Art. 18(a)(i)",
+      "description": "The commercial invoice issuer name does not match the beneficiary specified in the Letter of Credit."
+    }
+  ]
+}

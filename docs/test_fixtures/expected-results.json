@@ -1,0 +1,399 @@
+{
+  "schema_version": 1,
+  "description": "Machine-readable expected results for the LC/invoice checker fixtures. Every business value is derived from the real MT700 baseline and the real PDF/regulation output; this file is for TEST verification only and is never read by the production service. Discrepancy order follows the rule engine execution order (amount, currency, issuer, signature, applicant, address-country, goods, quantity, port-of-loading, port-of-discharge, lc-reference), which is deterministic.",
+  "rule_engine_order": [
+    "amount_rule",
+    "currency_rule",
+    "issuer_rule",
+    "signature_rule",
+    "applicant_rule",
+    "address_country_rule",
+    "goods_description_rule",
+    "quantity_rule",
+    "port_of_loading_rule",
+    "port_of_discharge_rule",
+    "lc_reference_rule"
+  ],
+  "baselines": {
+    "main": {
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "lc_number": "LC202607120001",
+      "currency": "USD",
+      "amount": "57500.00",
+      "tolerance": "5/5",
+      "amount_ceiling": "60375.00",
+      "amount_floor": "54625.00"
+    },
+    "import_reference": {
+      "lc_file": "lc/LC-DEMO-2026-0002-import-reference-fixed.mt700",
+      "lc_number": "LCDEMO2026-0002",
+      "currency": "USD",
+      "amount": "57500.00",
+      "tolerance": "0/0"
+    },
+    "parser_compat": {
+      "lc_file": "lc/MT700_Valid.mt700",
+      "lc_number": "LC20260001",
+      "currency": "USD",
+      "amount": "100000.00",
+      "tolerance": "0/0"
+    },
+    "invalid": {
+      "lc_file": "lc/MT700_Invalid_Missing32B.mt700",
+      "note": "Intentionally invalid: mandatory field 32B absent. Must fail before document comparison."
+    }
+  },
+  "cases": [
+    {
+      "id": "compliant-digital",
+      "category": "document-comparison",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-compliant-digital.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": null,
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": true,
+          "discrepancies": []
+        }
+      }
+    },
+    {
+      "id": "compliant-scanned",
+      "category": "document-comparison",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-compliant-scanned.pdf",
+      "pdf_type": "scanned",
+      "ocr_required": true,
+      "target_difference": null,
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": true,
+          "discrepancies": []
+        }
+      }
+    },
+    {
+      "id": "amount-exceeds",
+      "category": "document-comparison",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-amount-exceeds.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": "Invoice total USD 63,000.00 exceeds the USD 60,375.00 ceiling (LC 57,500.00 + 5% tolerance).",
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": false,
+          "discrepancies": [
+            {
+              "field": "totalAmount",
+              "lc_value": "Max Allowed: 60375.00",
+              "presented_value": "63000.00",
+              "rule_reference": "UCP 600 Art. 18(b)",
+              "description": "The invoice amount exceeds the maximum tolerance drawing limits allowed by LC terms."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "goods-model-mismatch",
+      "category": "document-comparison",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-goods-model-mismatch.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": "Goods identifier changed from REFINED SUGAR to BROWN SUGAR. Quantity, amount, parties, ports and currency unchanged.",
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": false,
+          "discrepancies": [
+            {
+              "field": "goodsDescription",
+              "lc_value": "100 METRIC TONS OF REFINED SUGAR\nINCOTERMS 2020 CIF HAMBURG",
+              "presented_value": "100 METRIC TONS OF BROWN SUGAR, INCOTERMS 2020 CIF HAMBURG",
+              "rule_reference": "UCP 600 Art. 18(c)",
+              "description": "The description of goods in the commercial invoice does not correspond with that appearing in the Letter of Credit."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "goods-quantity-mismatch",
+      "category": "document-comparison",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-goods-quantity-mismatch.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": "Quantity changed from 100 MT to 80 MT. Unit price adjusted (575.00 -> 718.75) so the total stays USD 57,500.00 (within tolerance) and no amount discrepancy is introduced.",
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": false,
+          "discrepancies": [
+            {
+              "field": "goodsDescription",
+              "lc_value": "100 METRIC TONS OF REFINED SUGAR\nINCOTERMS 2020 CIF HAMBURG",
+              "presented_value": "80 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG",
+              "rule_reference": "UCP 600 Art. 18(c)",
+              "description": "The description of goods in the commercial invoice does not correspond with that appearing in the Letter of Credit."
+            },
+            {
+              "field": "quantity",
+              "lc_value": "100 METRIC TONS",
+              "presented_value": "80 METRIC TONS",
+              "rule_reference": "UCP 600 Art. 30(b)",
+              "description": "The presented quantity does not fall within the tolerance permitted by the LC terms."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "seller-mismatch",
+      "category": "document-comparison",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-seller-mismatch.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": "Seller / issuer changed from XYZ EXPORT CO., LTD. to ACME SUGAR TRADING LTD.",
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": false,
+          "discrepancies": [
+            {
+              "field": "issuerName",
+              "lc_value": "XYZ EXPORT CO., LTD.",
+              "presented_value": "ACME SUGAR TRADING LTD",
+              "rule_reference": "UCP 600 Art. 18(a)(i)",
+              "description": "The commercial invoice issuer name does not match the beneficiary specified in the Letter of Credit."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "buyer-mismatch",
+      "category": "document-comparison",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-buyer-mismatch.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": "Buyer / applicant changed from ABC IMPORTERS PTE LTD to NORDIC TRADING ASIA PTE LTD.",
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": false,
+          "discrepancies": [
+            {
+              "field": "applicantName",
+              "lc_value": "ABC IMPORTERS PTE LTD",
+              "presented_value": "NORDIC TRADING ASIA PTE LTD",
+              "rule_reference": "UCP 600 Art. 18(a)(ii)",
+              "description": "The commercial invoice applicant name does not correspond to the applicant specified in the Letter of Credit."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "loading-location-mismatch",
+      "category": "document-comparison",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-loading-location-mismatch.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": "Port of loading changed from Port of Singapore to Port of Shanghai.",
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": false,
+          "discrepancies": [
+            {
+              "field": "portOfLoading",
+              "lc_value": "PORT OF SINGAPORE",
+              "presented_value": "Port of Shanghai",
+              "rule_reference": "UCP 600 Art. 14(d)",
+              "description": "The stated loading port conflicts with the credit."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "destination-mismatch",
+      "category": "document-comparison",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-destination-mismatch.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": "Port of discharge changed from Port of Hamburg to Port of Rotterdam.",
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": false,
+          "discrepancies": [
+            {
+              "field": "portOfDischarge",
+              "lc_value": "PORT OF HAMBURG",
+              "presented_value": "Port of Rotterdam",
+              "rule_reference": "UCP 600 Art. 14(d)",
+              "description": "The stated discharge port conflicts with the credit."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "currency-mismatch",
+      "category": "document-comparison",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-currency-mismatch.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": "Currency changed from USD to EUR everywhere on the invoice; numeric total stays 57,500.00 (within tolerance, so no amount discrepancy).",
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": false,
+          "discrepancies": [
+            {
+              "field": "currency",
+              "lc_value": "USD",
+              "presented_value": "EUR",
+              "rule_reference": "UCP 600 Art. 18(a)(iii)",
+              "description": "Currency mismatch: Invoice currency must be identical to LC currency."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "import-reference-missing",
+      "category": "document-comparison",
+      "lc_file": "lc/LC-DEMO-2026-0002-import-reference-fixed.mt700",
+      "invoice_file": "invoices/invoice-import-reference-missing.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": "The LC's :46A: expressly requires the documentary credit number on the invoice; the invoice omits it. All other fields match.",
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": false,
+          "discrepancies": [
+            {
+              "field": "lcReferenceNumber",
+              "lc_value": "LCDEMO2026-0002",
+              "presented_value": null,
+              "rule_reference": "ISBP 821 Preliminary Consideration (viii) / LC :46A",
+              "description": "The LC expressly requires the documentary credit number on the commercial invoice, but it is missing."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "import-reference-compliant",
+      "category": "document-comparison",
+      "lc_file": "lc/LC-DEMO-2026-0002-import-reference-fixed.mt700",
+      "invoice_file": "invoices/invoice-import-reference-compliant.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": null,
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": true,
+          "discrepancies": []
+        }
+      }
+    },
+    {
+      "id": "compliant-mt700-valid",
+      "category": "document-comparison",
+      "lc_file": "lc/MT700_Valid.mt700",
+      "invoice_file": "invoices/invoice-compliant-mt700-valid.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": null,
+      "expected": {
+        "status": "success",
+        "http_status": 200,
+        "response": {
+          "compliant": true,
+          "discrepancies": []
+        }
+      }
+    },
+    {
+      "id": "invalid-mt700-missing-32b",
+      "category": "input-validation",
+      "lc_file": "lc/MT700_Invalid_Missing32B.mt700",
+      "invoice_file": "invoices/invoice-compliant-digital.pdf",
+      "pdf_type": "digital",
+      "ocr_required": false,
+      "target_difference": "MT700 is missing mandatory field 32B. Must fail before document comparison; no fabricated LC amount, no ordinary document discrepancy.",
+      "expected": {
+        "status": "error",
+        "http_status": 422,
+        "error": {
+          "error": "UNPROCESSABLE_ENTITY",
+          "message": "Invalid MT700 format: mandatory field 32B (Currency Code, Amount) is missing."
+        }
+      }
+    },
+    {
+      "id": "unreadable-pdf",
+      "category": "input-validation",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-unreadable.pdf",
+      "pdf_type": "corrupt",
+      "ocr_required": false,
+      "target_difference": "Invoice PDF is corrupt and cannot be loaded/rendered. Must fail gracefully with a structured error; must not be reported compliant or produce a fake discrepancy.",
+      "expected": {
+        "status": "error",
+        "http_status": 422,
+        "error": {
+          "error": "UNPROCESSABLE_ENTITY",
+          "message": "PDF could not be rendered for text extraction or OCR; the document may be corrupt, encrypted, or unsupported."
+        }
+      }
+    },
+    {
+      "id": "ocr-insufficient",
+      "category": "input-validation",
+      "lc_file": "lc/SWIFT_MT700_Sample_Compliant.mt700",
+      "invoice_file": "invoices/invoice-compliant-scanned.pdf",
+      "pdf_type": "scanned",
+      "ocr_required": true,
+      "target_difference": "Image PDF whose OCR returns insufficient content (< threshold). Validated at the PdfTextExtractor unit-test layer with a mocked OCR service; no separate fixture file. Must not be reported compliant.",
+      "expected": {
+        "status": "error",
+        "http_status": 422,
+        "error": {
+          "error": "UNPROCESSABLE_ENTITY",
+          "message": "PDF text extraction and OCR fallback did not yield sufficient readable content."
+        }
+      }
+    }
+  ]
+}
