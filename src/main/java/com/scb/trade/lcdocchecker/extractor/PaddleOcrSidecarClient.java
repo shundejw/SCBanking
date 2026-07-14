@@ -24,7 +24,7 @@ import java.util.Base64;
 import java.util.Iterator;
 
 /**
- * OCR fallback client that talks to a PaddleOCR HTTP sidecar (see docs/Dockerfile). Renders
+ * OCR fallback client that talks to a PaddleOCR HTTP sidecar (see ocr_server/Dockerfile). Renders
  * each PDF page to a 300-DPI PNG, base64-encodes it, POSTs to the configured paddle URL and
  * concatenates recognised text fragments whose confidence meets the threshold.
  *
