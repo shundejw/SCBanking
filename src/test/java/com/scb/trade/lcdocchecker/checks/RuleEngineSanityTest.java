@@ -35,6 +35,7 @@ class RuleEngineSanityTest {
                 new ApplicantNameCheck(),
                 new AddressCountryCheck(),
                 new GoodsDescriptionCheck(),
+                new QuantityCheck(),
                 new PortOfLoadingCheck(),
                 new PortOfDischargeCheck(),
                 new LcReferenceCheck());
@@ -56,6 +57,26 @@ class RuleEngineSanityTest {
         CheckReport report = run(inv);
         assertTrue(report.compliant(), () -> "discrepancies=" + report.discrepancies());
         assertEquals(0, report.discrepancies().size());
+    }
+
+    @Test
+    void quantityMismatchProducesGoodsAndQuantityDiscrepancies() {
+        InvoiceFields inv = baseCompliant().toBuilder()
+                .goodsDescription("80 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG")
+                .build();
+        CheckReport report = run(inv);
+        assertEquals(2, report.discrepancies().size(), () -> "disc=" + report.discrepancies());
+        Discrepancy goods = report.discrepancies().get(0);
+        assertEquals("goodsDescription", goods.field());
+        assertEquals("100 METRIC TONS OF REFINED SUGAR\nINCOTERMS 2020 CIF HAMBURG", goods.lcValue());
+        assertEquals("80 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG", goods.presentedValue());
+        assertEquals("UCP 600 Art. 18(c)", goods.ruleReference());
+
+        Discrepancy quantity = report.discrepancies().get(1);
+        assertEquals("quantity", quantity.field());
+        assertEquals("100 METRIC TONS", quantity.lcValue());
+        assertEquals("80 METRIC TONS", quantity.presentedValue());
+        assertEquals("UCP 600 Art. 30(b)", quantity.ruleReference());
     }
 
     @Test

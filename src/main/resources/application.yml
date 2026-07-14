@@ -37,7 +37,7 @@ lcchecker:
     base-url: "https://open.bigmodel.cn/api/coding/paas/v4/"
     api-key: "${ZHIPU_API_KEY:${SPRING_AI_API_KEY:}}"
     temperature: 0.0
-    timeout-ms: 10000
+    timeout: 10s
     prompt-template-path: "classpath:prompts/invoice-extraction-v1.st"
 
   # Deterministic rule-engine execution order. All checks enabled.
@@ -50,14 +50,10 @@ lcchecker:
       - "applicant_rule"
       - "address_country_rule"
       - "goods_description_rule"
+      - "quantity_rule"
       - "port_of_loading_rule"
       - "port_of_discharge_rule"
       - "lc_reference_rule"
-      # quantity_rule is intentionally NOT enabled: the fixture contract
-      # (docs/test_fixtures/expected-results.json) routes quantity mismatches through the
-      # goods-description check (UCP 600 Art. 18(c)), so an active QuantityCheck would
-      # double-count the same discrepancy in production. The check remains registered,
-      # unit-tested, and available to enable when the contract is extended.
 
   # Intermediate-artifact store. Goal doc references /mnt/local/SCB/docs/artifacts/{runId}/;
   # defaulting to a relative docs/artifacts keeps the same {project}/docs/artifacts layout locally.

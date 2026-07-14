@@ -13,6 +13,7 @@ import com.scb.trade.lcdocchecker.checks.IssuerNameCheck;
 import com.scb.trade.lcdocchecker.checks.LcReferenceCheck;
 import com.scb.trade.lcdocchecker.checks.PortOfDischargeCheck;
 import com.scb.trade.lcdocchecker.checks.PortOfLoadingCheck;
+import com.scb.trade.lcdocchecker.checks.QuantityCheck;
 import com.scb.trade.lcdocchecker.checks.SignatureCheck;
 import com.scb.trade.lcdocchecker.domain.CheckReport;
 import com.scb.trade.lcdocchecker.domain.Discrepancy;
@@ -115,6 +116,7 @@ class ExpectedResultsManifestTest {
                 new ApplicantNameCheck(),
                 new AddressCountryCheck(),
                 new GoodsDescriptionCheck(),
+                new QuantityCheck(),
                 new PortOfLoadingCheck(),
                 new PortOfDischargeCheck(),
                 new LcReferenceCheck());

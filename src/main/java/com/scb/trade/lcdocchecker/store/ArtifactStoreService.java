@@ -61,10 +61,28 @@ public class ArtifactStoreService {
     /** @return the raw JSON for a stage, or {@code null} if absent. */
     public String load(String runId, String stage) {
         Map<String, String> stages = cache.get(runId);
-        return stages == null ? null : stages.get(stage);
+        if (stages != null && stages.containsKey(stage)) {
+            return stages.get(stage);
+        }
+        Path file = Path.of(props.rootDir(), runId, stage + ".json");
+        if (!Files.exists(file)) {
+            return null;
+        }
+        try {
+            String json = Files.readString(file);
+            cache.computeIfAbsent(runId, k -> new ConcurrentHashMap<>()).put(stage, json);
+            return json;
+        } catch (IOException e) {
+            FlowLog.warn(log, ArtifactStoreService.class, "load",
+                    "stage", "ERROR",
+                    "runId", runId,
+                    "step", stage,
+                    "errorMessage", e.getMessage());
+            return null;
+        }
     }
 
     public boolean exists(String runId) {
-        return cache.containsKey(runId);
+        return cache.containsKey(runId) || Files.exists(Path.of(props.rootDir(), runId));
     }
 }
