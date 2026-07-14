@@ -43,6 +43,8 @@ logs/
 .env.*.local
 *.pem
 *.key
+# start-services.sh contains a hardcoded DeepSeek API key
+start-services.sh
 
 # --- Local backups / archives ---
 src.zip

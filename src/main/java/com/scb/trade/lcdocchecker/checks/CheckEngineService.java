@@ -55,7 +55,11 @@ public class CheckEngineService {
                 .filter(c -> enabled == null || enabled.contains(c.checkId()))
                 .toList();
         FlowLog.info(log, CheckEngineService.class, "run",
-                "stage", "START", "runId", runId, "checkCount", active.size());
+                "stage", "START",
+                "runId", runId,
+                "checkCount", active.size(),
+                "input.lc", FlowLog.prettyValue(lc),
+                "input.invoice", FlowLog.prettyValue(invoice));
 
         List<CheckResult> results = active.stream()
                 .map(c -> executeSafely(runId, c, lc, invoice))
@@ -73,6 +77,7 @@ public class CheckEngineService {
                 "fail", fail,
                 "unable", unable,
                 "notApplicable", na,
+                "output.results", FlowLog.prettyValue(results),
                 "costMs", elapsedMs(startNs));
         return results;
     }
@@ -83,6 +88,11 @@ public class CheckEngineService {
     }
 
     private CheckResult executeSafely(String runId, DocumentCheck check, LcTerms lc, InvoiceFields invoice) {
+        FlowLog.info(log, CheckEngineService.class, "executeSafely",
+                "stage", "STEP",
+                "runId", runId,
+                "step", check.checkId(),
+                "input", FlowLog.prettyValue(stepInputSummary(lc, invoice)));
         try {
             CheckResult result = check.execute(lc, invoice);
             logCheckResult(runId, check.checkId(), result);
@@ -93,7 +103,7 @@ public class CheckEngineService {
                     "runId", runId,
                     "step", check.checkId(),
                     "result", "UNABLE",
-                    "errorMessage", e.getMessage());
+                    "errorMessage", FlowLog.prettyValue(e.getMessage()));
             return CheckResult.unable(check.checkId(),
                     "Check '" + check.checkId() + "' could not be completed: " + e.getMessage());
         }
@@ -107,6 +117,7 @@ public class CheckEngineService {
                     "runId", runId,
                     "step", checkId,
                     "result", "FAIL",
+                    "output", FlowLog.prettyValue(result),
                     "field", d == null ? "unknown" : d.field(),
                     "reason", d == null ? "discrepancy" : d.description());
             return;
@@ -117,6 +128,7 @@ public class CheckEngineService {
                     "runId", runId,
                     "step", checkId,
                     "result", "UNABLE",
+                    "output", FlowLog.prettyValue(result),
                     "reason", result.message());
             return;
         }
@@ -124,7 +136,31 @@ public class CheckEngineService {
                 "stage", "STEP",
                 "runId", runId,
                 "step", checkId,
-                "result", result.status().name());
+                "result", result.status().name(),
+                "output", FlowLog.prettyValue(result));
+    }
+
+    private String stepInputSummary(LcTerms lc, InvoiceFields invoice) {
+        return "LcTerms{"
+                + "lcNumber=" + lc.lcNumber()
+                + ", currency=" + lc.currency()
+                + ", amount=" + lc.amount()
+                + ", applicantName=" + lc.applicantName()
+                + ", beneficiaryName=" + lc.beneficiaryName()
+                + ", portOfLoading=" + lc.portOfLoading()
+                + ", portOfDischarge=" + lc.portOfDischarge()
+                + ", goodsDescription=" + lc.goodsDescription()
+                + "}\n"
+                + "InvoiceFields{"
+                + "sellerName=" + invoice.sellerName()
+                + ", applicantName=" + invoice.applicantName()
+                + ", currency=" + invoice.currency()
+                + ", totalAmount=" + invoice.totalAmount()
+                + ", portOfLoading=" + invoice.portOfLoading()
+                + ", portOfDischarge=" + invoice.portOfDischarge()
+                + ", lcReferenceNumber=" + invoice.lcReferenceNumber()
+                + ", goodsDescription=" + invoice.goodsDescription()
+                + "}";
     }
 
     private static long elapsedMs(long startNs) {

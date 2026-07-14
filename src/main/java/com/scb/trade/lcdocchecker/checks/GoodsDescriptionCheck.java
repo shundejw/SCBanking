@@ -45,7 +45,8 @@ public class GoodsDescriptionCheck implements DocumentCheck {
         boolean corresponds = lcTokens.equals(invTokens)
                 || lcTokens.containsAll(invTokens)
                 || invTokens.containsAll(lcTokens)
-                || jaccard(lcTokens, invTokens) >= CORRESPOND_THRESHOLD;
+                || jaccard(lcTokens, invTokens) >= CORRESPOND_THRESHOLD
+                || squeeze(lc.goodsDescription()).equals(squeeze(invoice.goodsDescription()));
 
         if (!corresponds) {
             Discrepancy d = Discrepancy.of(FIELD, lc.goodsDescription(), invoice.goodsDescription(), RULE, DESCRIPTION);
@@ -57,6 +58,15 @@ public class GoodsDescriptionCheck implements DocumentCheck {
     static Set<String> goodsTokens(String raw) {
         String cleaned = raw.toUpperCase().replaceAll("[^A-Z0-9]", " ").trim();
         return new java.util.LinkedHashSet<>(java.util.Arrays.asList(cleaned.split("\\s+")));
+    }
+
+    /**
+     * Whitespace-agnostic fingerprint: uppercased with all non-alphanumeric characters removed.
+     * OCR-scanned invoices frequently lose inter-word spaces (tokens concatenated); this lets
+     * identical descriptions that differ only in whitespace/punctuation still correspond.
+     */
+    static String squeeze(String raw) {
+        return raw == null ? "" : raw.toUpperCase().replaceAll("[^A-Z0-9]", "");
     }
 
     private static double jaccard(Set<String> a, Set<String> b) {

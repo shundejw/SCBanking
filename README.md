@@ -92,7 +92,7 @@ java -jar target/lc-checker-1.0.0-SNAPSHOT.jar
 
 LLM access is environment-injected (never hardcoded):
 ```bash
-export ZHIPU_API_KEY=...        # or SPRING_AI_API_KEY
+export SPRING_AI_API_KEY=...
 ```
 All tunable knobs (OCR sidecar URL/timeout, rule allowlist, artifact root, LLM model/temperature) live in `src/main/resources/application.yml`.
 
