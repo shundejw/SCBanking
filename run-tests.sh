@@ -149,7 +149,7 @@ run_case() {
     verdict="FAIL"; vcolor="$C_RED"
     echo "${C_DIM}  expect HTTP $exp_http, got $code${C_RESET}"
   elif [ "$exp_http" = "200" ]; then
-    local comp; comp=$(jq -r '.compliant // "N/A"' "$TMP_RESP")
+    local comp; comp=$(jq -r 'if has("compliant") then (.compliant | tostring) else "N/A" end' "$TMP_RESP")
     if [ "$comp" != "$exp_comp" ]; then
       verdict="FAIL"; vcolor="$C_RED"
       echo "${C_DIM}  expect compliant=$exp_comp, got=$comp${C_RESET}"
