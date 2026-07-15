@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -87,7 +88,7 @@ public class LlmGoodsDescriptionCheck implements DocumentCheck<InvoiceFields> {
             if (verdict == null || verdict.corresponds() == null) {
                 return CheckResult.unable(checkId(), "LLM returned no usable verdict.");
             }
-            if (verdict.corresponds()) {
+            if (Boolean.TRUE.equals(verdict.corresponds())) {
                 return CheckResult.pass(checkId());
             }
             String reason = isBlank(verdict.reason())
@@ -125,7 +126,7 @@ public class LlmGoodsDescriptionCheck implements DocumentCheck<InvoiceFields> {
                 .replaceAll("(?i)disregard (all|any) prior instructions", "[redacted instruction]");
     }
 
-    private static <T> T runWithTimeout(Callable<T> task, Duration timeout) throws Exception {
+    private static <T> T runWithTimeout(Callable<T> task, Duration timeout) {
         var executor = Executors.newSingleThreadExecutor();
         try {
             Future<T> future = executor.submit(task);
@@ -135,6 +136,11 @@ public class LlmGoodsDescriptionCheck implements DocumentCheck<InvoiceFields> {
                 future.cancel(true);
                 throw new IllegalStateException(
                         "LLM goods-description check timed out after " + timeout.toMillis() + "ms.", e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("LLM goods-description check interrupted.", e);
+            } catch (ExecutionException e) {
+                throw new IllegalStateException("LLM goods-description check failed.", e);
             }
         } finally {
             executor.shutdownNow();
