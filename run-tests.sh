@@ -67,6 +67,7 @@ PASS=0; WARN=0; FAIL=0
 SCENARIOS=(
   "compliant-digital|SWIFT_MT700_Sample_Compliant.mt700|invoice-compliant-digital.pdf|200|true|"
   "compliant-scanned|SWIFT_MT700_Sample_Compliant.mt700|invoice-compliant-scanned.pdf|200|true|"
+  "compliant-hybrid|SWIFT_MT700_Sample_Compliant.mt700|invoice-compliant-hybrid.pdf|200|true|"
   "amount-exceeds|SWIFT_MT700_Sample_Compliant.mt700|invoice-amount-exceeds.pdf|200|false|invoice_amount"
   "goods-model-mismatch|SWIFT_MT700_Sample_Compliant.mt700|invoice-goods-model-mismatch.pdf|200|~false|goods_description"
   "goods-quantity-mismatch|SWIFT_MT700_Sample_Compliant.mt700|invoice-goods-quantity-mismatch.pdf|200|false|goods_description,quantity"
@@ -105,7 +106,7 @@ check_services() {
   echo "OCR  ($OCR_URL):"
   c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$OCR_URL/health" 2>/dev/null || echo 000)
   if [ "$c" = "000" ]; then
-    echo "  ${C_YELLOW}DOWN — scanned-PDF 场景 (compliant-scanned) 会失败/降级${C_RESET}"
+    echo "  ${C_YELLOW}DOWN — OCR 场景 (compliant-scanned, compliant-hybrid) 会失败/降级${C_RESET}"
   else
     echo "  ${C_GREEN}UP (HTTP $c)${C_RESET}"
   fi

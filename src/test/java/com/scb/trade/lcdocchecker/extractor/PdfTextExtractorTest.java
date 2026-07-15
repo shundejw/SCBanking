@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -96,5 +97,37 @@ class PdfTextExtractorTest {
                 () -> extractor.extract(pdf));
         assertTrue(ex.getMessage().contains("no text for page"), ex.getMessage());
         assertEquals(1, ocrCalls.get());
+    }
+
+    @Test
+    void hybridPdf_routesPage1TextAndPage2Ocr() throws Exception {
+        // Mixed PDF: page 1 = full digital invoice (text layer), page 2 = scanned signature/stamp
+        // (image). Verifies the per-page pipeline: page 1 -> TEXT (no OCR), page 2 -> OCR, merged.
+        // Compliance-critical fields live on page 1 (reliable text layer); page 2 is non-critical.
+        List<OcrPageRequest> captured = new ArrayList<>();
+        AtomicInteger ocrCalls = new AtomicInteger();
+        OcrGateway stub = reqs -> {
+            ocrCalls.incrementAndGet();
+            captured.addAll(reqs);
+            return reqs.stream()
+                    .map(r -> new OcrPageResult(r.pageNumber(),
+                            "AUTHORIZED SIGNATURE\nFor and on behalf of XYZ EXPORT CO., LTD.\n"
+                                    + "XYZ EXPORT APPROVED (scanned stamp)"))
+                    .toList();
+        };
+        PdfTextExtractor extractor = newExtractor(stub);
+
+        PdfTextExtractor.ExtractedPdf out = extractor.extract(read("invoice-compliant-hybrid.pdf"));
+
+        assertTrue(out.ocrUsed(), "the scanned page 2 must trigger OCR");
+        assertEquals(1, ocrCalls.get(), "OCR must be a single batched call");
+        assertEquals(List.of(2), captured.stream().map(OcrPageRequest::pageNumber).toList(),
+                "only page 2 should be OCR'd; page 1 must use the text layer");
+        assertTrue(out.text().contains("100 METRIC TONS OF REFINED SUGAR"),
+                () -> "missing page-1 digital goods description: " + out.text());
+        assertTrue(out.text().contains("XYZ EXPORT CO., LTD."),
+                () -> "missing page-1 text-layer content: " + out.text());
+        assertTrue(out.text().contains("APPROVED"),
+                () -> "missing page-2 OCR (signature/stamp) content: " + out.text());
     }
 }

@@ -48,6 +48,7 @@ the native text layer is extracted (OCR is not triggered, and `PdfTextExtractorT
 |---|---|---|---|---|---|---|---|
 | compliant-digital | main | invoice-compliant-digital.pdf | digital | no | — | compliant | — |
 | compliant-scanned | main | invoice-compliant-scanned.pdf | scanned | **yes** | — | compliant | — |
+| compliant-hybrid | main | invoice-compliant-hybrid.pdf | **hybrid (p1 digital + p2 scanned)** | **yes (p2 only)** | per-page TEXT/OCR routing on a mixed doc | compliant | — |
 | amount-exceeds | main | invoice-amount-exceeds.pdf | digital | no | total USD 63,000.00 > 60,375.00 ceiling | not compliant | totalAmount (UCP 600 Art. 18(b)) |
 | goods-model-mismatch | main | invoice-goods-model-mismatch.pdf | digital | no | REFINED SUGAR → BROWN SUGAR | not compliant | goodsDescription (UCP 600 Art. 18(c)) |
 | goods-quantity-mismatch | main | invoice-goods-quantity-mismatch.pdf | digital | no | 100 MT → 80 MT (total kept at 57,500) | not compliant | goodsDescription (UCP 600 Art. 18(c)) |
