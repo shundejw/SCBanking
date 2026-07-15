@@ -8,6 +8,9 @@ import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.extractor.InvoiceExtractionService;
 import com.scb.trade.lcdocchecker.extractor.OcrGateway;
+import com.scb.trade.lcdocchecker.extractor.OcrPageRequest;
+import com.scb.trade.lcdocchecker.extractor.OcrPageResult;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,7 +66,7 @@ class InvoiceCheckControllerIntegrationTest {
         // Boot 4.1 dropped @AutoConfigureMockMvc; build MockMvc from the wired context.
         this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
         // default: OCR returns rich text if ever invoked; individual tests override.
-        when(ocrGateway.extract(any())).thenReturn("".repeat(0));
+        when(ocrGateway.extractPages(any())).thenReturn(List.of());
         // The mocked InvoiceExtractionService also implements DocumentExtractor; declare its
         // document type so the dispatcher routes INVOICE documents to it.
         when(invoiceExtractionService.documentType()).thenReturn(DocumentType.INVOICE);
@@ -156,10 +159,13 @@ class InvoiceCheckControllerIntegrationTest {
 
     @Test
     void scannedPdfUsesOcrFallbackThenReturnsCompliant() throws Exception {
-        when(ocrGateway.extract(any())).thenReturn(
-                "XYZ EXPORT CO., LTD. ABC IMPORTERS PTE LTD. Currency: USD. "
-                        + "Description of Goods: 100 METRIC TONS OF REFINED SUGAR CIF HAMBURG. "
-                        + "Total Invoice Value USD 57,500.00.");
+        String ocrText = "XYZ EXPORT CO., LTD. ABC IMPORTERS PTE LTD. Currency: USD. "
+                + "Description of Goods: 100 METRIC TONS OF REFINED SUGAR CIF HAMBURG. "
+                + "Total Invoice Value USD 57,500.00.";
+        when(ocrGateway.extractPages(any())).thenAnswer(inv -> {
+            List<OcrPageRequest> reqs = inv.getArgument(0);
+            return reqs.stream().map(r -> new OcrPageResult(r.pageNumber(), ocrText)).toList();
+        });
         when(invoiceExtractionService.extract(anyString())).thenReturn(mainCompliant());
 
         mockMvc.perform(multipart("/checks")
@@ -194,15 +200,18 @@ class InvoiceCheckControllerIntegrationTest {
     }
 
     @Test
-    void ocrInsufficientReturns422() throws Exception {
-        when(ocrGateway.extract(any())).thenReturn("x"); // below the 100-char threshold
+    void ocrBlankForScannedPageReturns422_noSilentLoss() throws Exception {
+        when(ocrGateway.extractPages(any())).thenAnswer(inv -> {
+            List<OcrPageRequest> reqs = inv.getArgument(0);
+            return reqs.stream().map(r -> new OcrPageResult(r.pageNumber(), "")).toList();
+        });
         mockMvc.perform(multipart("/checks")
                         .file(invoicePart("invoice-compliant-scanned.pdf"))
                         .param("lc", lc("SWIFT_MT700_Sample_Compliant.mt700")))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.error").value("UNPROCESSABLE_ENTITY"))
                 .andExpect(jsonPath("$.message").value(
-                        "PDF text extraction and OCR fallback did not yield sufficient readable content."));
+                        org.hamcrest.Matchers.containsString("no text for page")));
     }
 
     @Test

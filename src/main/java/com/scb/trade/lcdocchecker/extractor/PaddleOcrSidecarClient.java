@@ -5,9 +5,6 @@ import tools.jackson.databind.ObjectMapper;
 import com.scb.trade.lcdocchecker.config.OcrProperties;
 import com.scb.trade.lcdocchecker.exception.DocumentExtractionException;
 import com.scb.trade.lcdocchecker.util.FlowLog;
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.rendering.PDFRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
@@ -16,19 +13,25 @@ import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Iterator;
+import java.util.List;
 
 /**
- * OCR fallback client that talks to a PaddleOCR HTTP sidecar (see ocr_server/Dockerfile). Renders
- * each PDF page to a 300-DPI PNG, base64-encodes it, POSTs to the configured paddle URL and
- * concatenates recognised text fragments whose confidence meets the threshold.
+ * OCR sidecar client talking to a PaddleOCR HTTP service. Receives pre-rendered page images
+ * ({@link OcrPageRequest}), base64-encodes them, POSTs {@code {"images":[...]}} and returns one
+ * recognised-text result per page. Page rendering lives in the caller, so this class has no PDF
+ * dependency.
  *
- * <p>Network/parse failures are thrown as {@link DocumentExtractionException} — never silent.
+ * <p>Response mapping expects PaddleOCR's {@code {"results":[[ ... ], ...]}} schema: the
+ * {@code results} array holds one element per input image, in input order; each element is the
+ * list of {@code {text, confidence}} detections for that page. A missing {@code results} array or
+ * a count mismatch is a loud failure (no silent page loss / no ambiguous page mapping). The caller
+ * additionally rejects blank text for a page that should contain content.
+ *
+ * <p>Network/parse failures throw {@link DocumentExtractionException} — never silent.
  */
 @Component
 public class PaddleOcrSidecarClient implements OcrGateway {
@@ -48,16 +51,19 @@ public class PaddleOcrSidecarClient implements OcrGateway {
     }
 
     @Override
-    public String extract(byte[] pdfBytes) {
+    public List<OcrPageResult> extractPages(List<OcrPageRequest> pages) {
         long startNs = System.nanoTime();
         String endpoint = props.paddle() == null ? null : props.paddle().url();
         if (endpoint == null || endpoint.isBlank()) {
             throw new DocumentExtractionException("OCR sidecar URL is not configured.");
         }
+        if (pages == null || pages.isEmpty()) {
+            return List.of();
+        }
         try {
-            String[] images = renderPagesToBase64(pdfBytes);
-            FlowLog.info(log, PaddleOcrSidecarClient.class, "extract",
-                    "stage", "START", "pages", images.length, "endpoint", maskEndpoint(endpoint));
+            List<String> images = encodeImages(pages);
+            FlowLog.info(log, PaddleOcrSidecarClient.class, "extractPages",
+                    "stage", "START", "pages", images.size(), "endpoint", maskEndpoint(endpoint));
             String body = buildRequestBody(images);
             String response = restClient.post()
                     .uri(endpoint)
@@ -65,18 +71,19 @@ public class PaddleOcrSidecarClient implements OcrGateway {
                     .body(body)
                     .retrieve()
                     .body(String.class);
-            String text = parseText(response);
-            FlowLog.info(log, PaddleOcrSidecarClient.class, "extract",
+            List<OcrPageResult> results = parsePages(response, pages);
+            int chars = results.stream().mapToInt(r -> r.text().length()).sum();
+            FlowLog.info(log, PaddleOcrSidecarClient.class, "extractPages",
                     "stage", "END",
                     "result", "success",
-                    "pages", images.length,
-                    "textChars", text.length(),
+                    "pages", results.size(),
+                    "textChars", chars,
                     "costMs", elapsedMs(startNs));
-            return text;
+            return results;
         } catch (DocumentExtractionException e) {
             throw e;
         } catch (Exception e) {
-            FlowLog.warn(log, PaddleOcrSidecarClient.class, "extract",
+            FlowLog.warn(log, PaddleOcrSidecarClient.class, "extractPages",
                     "stage", "ERROR",
                     "errorMessage", e.getMessage(),
                     "costMs", elapsedMs(startNs));
@@ -84,41 +91,50 @@ public class PaddleOcrSidecarClient implements OcrGateway {
         }
     }
 
-    private String[] renderPagesToBase64(byte[] pdfBytes) throws Exception {
-        try (PDDocument doc = Loader.loadPDF(pdfBytes)) {
-            PDFRenderer renderer = new PDFRenderer(doc);
-            String[] out = new String[doc.getNumberOfPages()];
-            for (int i = 0; i < doc.getNumberOfPages(); i++) {
-                BufferedImage img = renderer.renderImageWithDPI(i, 300);
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                ImageIO.write(img, "png", baos);
-                out[i] = Base64.getEncoder().encodeToString(baos.toByteArray());
-            }
-            return out;
+    private List<String> encodeImages(List<OcrPageRequest> pages) {
+        List<String> out = new ArrayList<>(pages.size());
+        for (OcrPageRequest p : pages) {
+            out.add(Base64.getEncoder().encodeToString(p.imageBytes()));
         }
+        return out;
     }
 
-    private String buildRequestBody(String[] images) throws Exception {
+    private String buildRequestBody(List<String> images) {
         StringBuilder sb = new StringBuilder("{\"images\":[");
-        for (int i = 0; i < images.length; i++) {
-            if (i > 0) sb.append(',');
-            sb.append('"').append(images[i].replace("\\", "\\\\").replace("\"", "\\\"")).append('"');
+        for (int i = 0; i < images.size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append('"').append(images.get(i).replace("\\", "\\\\").replace("\"", "\\\"")).append('"');
         }
         sb.append("]}");
         return sb.toString();
     }
 
-    /** Walk the JSON collecting every {@code text} whose sibling {@code confidence} passes the threshold. */
-    private String parseText(String response) throws Exception {
+    List<OcrPageResult> parsePages(String response, List<OcrPageRequest> requests) throws Exception {
         if (response == null || response.isBlank()) {
-            return "";
+            throw new DocumentExtractionException(
+                    "OCR sidecar returned an empty response for " + requests.size() + " page(s).");
         }
-        JsonNode root = mapper.readTree(response);
-        StringBuilder text = new StringBuilder();
-        collect(root, text);
-        return text.toString();
+        JsonNode results = mapper.readTree(response).path("results");
+        if (!results.isArray()) {
+            throw new DocumentExtractionException(
+                    "OCR sidecar response had no 'results' array; cannot map results to pages.");
+        }
+        if (results.size() != requests.size()) {
+            throw new DocumentExtractionException("OCR sidecar returned " + results.size()
+                    + " result set(s) for " + requests.size() + " page(s); refusing to map pages ambiguously.");
+        }
+        List<OcrPageResult> out = new ArrayList<>(requests.size());
+        for (int i = 0; i < results.size(); i++) {
+            StringBuilder text = new StringBuilder();
+            collect(results.get(i), text);
+            out.add(new OcrPageResult(requests.get(i).pageNumber(), text.toString()));
+        }
+        return out;
     }
 
+    /** Walk a JSON subtree collecting every {@code text} whose sibling {@code confidence} passes the threshold. */
     private void collect(JsonNode node, StringBuilder out) {
         if (node == null) {
             return;

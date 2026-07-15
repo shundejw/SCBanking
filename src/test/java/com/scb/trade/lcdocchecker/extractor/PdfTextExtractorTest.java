@@ -1,39 +1,50 @@
 package com.scb.trade.lcdocchecker.extractor;
 
-import com.scb.trade.lcdocchecker.config.OcrProperties;
+import com.scb.trade.lcdocchecker.config.PageAnalysisProperties;
 import com.scb.trade.lcdocchecker.exception.DocumentExtractionException;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Verifies the dual-stage extraction against the real fixture PDFs. OCR is stubbed so the
- * suite stays deterministic (no live sidecar).
+ * Verifies per-page extraction against the real fixture PDFs. OCR is stubbed so the suite stays
+ * deterministic (no live sidecar).
  */
 class PdfTextExtractorTest {
 
     private static final Path INV_DIR = Path.of("docs/test_fixtures/invoices");
-    private static final OcrProperties PROPS =
-            new OcrProperties(0.80, 100, "http://localhost:8000/api/v1/ocr", Duration.ofSeconds(30),
-                    new OcrProperties.Paddle("http://localhost:8866/predict/ocr_system"));
+
+    private static final String COMPLIANT_TEXT = """
+            SELLER / BENEFICIARY  XYZ EXPORT CO., LTD.
+            BUYER / APPLICANT     ABC IMPORTERS PTE LTD
+            Currency: USD
+            Description of Goods: 100 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG
+            Total Invoice Value   USD 57,500.00
+            """;
 
     private byte[] read(String name) throws Exception {
         return Files.readAllBytes(INV_DIR.resolve(name));
     }
 
+    private PdfTextExtractor newExtractor(OcrGateway gateway) {
+        PageSignalCollector collector = new PageSignalCollector();
+        PageExtractionDecider decider = new PageExtractionDecider(new PageAnalysisProperties(null, null, null));
+        return new PdfTextExtractor(collector, decider, gateway);
+    }
+
     @Test
     void digitalPdfExtractsTextLayerWithoutOcr() throws Exception {
         AtomicInteger ocrCalls = new AtomicInteger();
-        OcrGateway stub = bytes -> {
+        OcrGateway stub = reqs -> {
             ocrCalls.incrementAndGet();
-            return "should-not-be-used";
+            return List.of();
         };
-        PdfTextExtractor extractor = new PdfTextExtractor(PROPS, stub);
+        PdfTextExtractor extractor = newExtractor(stub);
 
         PdfTextExtractor.ExtractedPdf out = extractor.extract(read("invoice-compliant-digital.pdf"));
 
@@ -45,54 +56,45 @@ class PdfTextExtractorTest {
     @Test
     void scannedPdfFallsBackToOcr() throws Exception {
         AtomicInteger ocrCalls = new AtomicInteger();
-        // OCR stub returns the compliant invoice text (sufficient length).
-        OcrGateway stub = bytes -> {
+        OcrGateway stub = reqs -> {
             ocrCalls.incrementAndGet();
-            return """
-                    SELLER / BENEFICIARY  XYZ EXPORT CO., LTD.
-                    BUYER / APPLICANT     ABC IMPORTERS PTE LTD
-                    Currency: USD
-                    Description of Goods: 100 METRIC TONS OF REFINED SUGAR, INCOTERMS 2020 CIF HAMBURG
-                    Total Invoice Value   USD 57,500.00
-                    """;
+            return reqs.stream().map(r -> new OcrPageResult(r.pageNumber(), COMPLIANT_TEXT)).toList();
         };
-        PdfTextExtractor extractor = new PdfTextExtractor(PROPS, stub);
+        PdfTextExtractor extractor = newExtractor(stub);
 
         PdfTextExtractor.ExtractedPdf out = extractor.extract(read("invoice-compliant-scanned.pdf"));
 
         assertTrue(out.ocrUsed(), "scanned PDF must trigger OCR fallback");
-        assertEquals(1, ocrCalls.get(), "OCR must be invoked exactly once");
+        assertEquals(1, ocrCalls.get(), "OCR must be invoked exactly once (single batched call)");
         assertTrue(out.text().contains("REFINED SUGAR"));
     }
 
     @Test
     void corruptPdfThrowsUnreadableMessage() throws Exception {
-        OcrGateway stub = bytes -> "unused";
-        PdfTextExtractor extractor = new PdfTextExtractor(PROPS, stub);
+        byte[] pdf = read("invoice-unreadable.pdf");
+        OcrGateway stub = reqs -> List.of();
+        PdfTextExtractor extractor = newExtractor(stub);
 
         DocumentExtractionException ex = assertThrows(DocumentExtractionException.class,
-                () -> extractor.extract(read("invoice-unreadable.pdf")));
-        // Exact fixture wording.
+                () -> extractor.extract(pdf));
         assertEquals(
                 "PDF could not be rendered for text extraction or OCR; the document may be corrupt, encrypted, or unsupported.",
                 ex.getMessage());
     }
 
     @Test
-    void ocrInsufficientThrowsSpecificMessage() {
+    void ocrBlankForPage_failsLoudly_noSilentLoss() throws Exception {
+        byte[] pdf = read("invoice-compliant-scanned.pdf");
         AtomicInteger ocrCalls = new AtomicInteger();
-        OcrGateway stub = bytes -> {
+        OcrGateway stub = reqs -> {
             ocrCalls.incrementAndGet();
-            return "x"; // far below the 100-char threshold
+            return reqs.stream().map(r -> new OcrPageResult(r.pageNumber(), "")).toList();
         };
-        PdfTextExtractor extractor = new PdfTextExtractor(PROPS, stub);
+        PdfTextExtractor extractor = newExtractor(stub);
 
-        // A scanned PDF whose OCR returns almost nothing.
         DocumentExtractionException ex = assertThrows(DocumentExtractionException.class,
-                () -> extractor.extract(read("invoice-compliant-scanned.pdf")));
-        assertEquals(
-                "PDF text extraction and OCR fallback did not yield sufficient readable content.",
-                ex.getMessage());
+                () -> extractor.extract(pdf));
+        assertTrue(ex.getMessage().contains("no text for page"), ex.getMessage());
         assertEquals(1, ocrCalls.get());
     }
 }

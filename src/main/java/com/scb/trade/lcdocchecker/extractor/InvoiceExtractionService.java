@@ -7,6 +7,8 @@ import com.scb.trade.lcdocchecker.domain.InvoiceExtractedData;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.exception.DocumentExtractionException;
 import com.scb.trade.lcdocchecker.util.FlowLog;
+import com.scb.trade.lcdocchecker.validation.ExtractionValidation;
+import com.scb.trade.lcdocchecker.validation.InvoiceFieldValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -38,12 +40,15 @@ public class InvoiceExtractionService implements DocumentExtractor<InvoiceFields
     private final ChatClient chatClient;
     private final String promptTemplate;
     private final Duration timeout;
+    private final InvoiceFieldValidator fieldValidator;
 
     public InvoiceExtractionService(ChatClient chatClient,
                                     LlmProperties llmProperties,
+                                    InvoiceFieldValidator fieldValidator,
                                     @Value("${lcchecker.llm.prompt-template-path:classpath:prompts/invoice-extraction-v1.st}")
                                     Resource promptResource) {
         this.chatClient = chatClient;
+        this.fieldValidator = fieldValidator;
         this.timeout = llmProperties == null ? Duration.ofSeconds(10) : llmProperties.effectiveTimeout();
         try {
             this.promptTemplate = new String(promptResource.getContentAsByteArray(), StandardCharsets.UTF_8);
@@ -73,6 +78,12 @@ public class InvoiceExtractionService implements DocumentExtractor<InvoiceFields
         };
         try {
             InvoiceFields fields = runWithTimeout(task, timeout);
+            ExtractionValidation validation = fieldValidator.validate(fields);
+            FlowLog.info(log, InvoiceExtractionService.class, "extract",
+                    "stage", "STEP",
+                    "step", "fieldValidation",
+                    "status", validation.status(),
+                    "findings", validation.findings().size());
             FlowLog.info(log, InvoiceExtractionService.class, "extract",
                     "stage", "END",
                     "result", "success",
