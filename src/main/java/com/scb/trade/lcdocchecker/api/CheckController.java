@@ -29,7 +29,7 @@ import java.util.UUID;
  *   <li>{@code GET /checks/{runId}} — final compliance report.</li>
  *   <li>{@code GET /checks/{runId}/artifacts/{stage}} — intermediate artifact JSON
  *       (lc_parsed, {@code <documentType>_extracted} e.g. invoice_extracted, pdf_text,
- *       check_results, final_report).</li>
+ *       extraction_validation, check_results, final_report).</li>
  * </ul>
  */
 @RestController

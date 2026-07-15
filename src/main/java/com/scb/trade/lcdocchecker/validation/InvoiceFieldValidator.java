@@ -1,6 +1,7 @@
 package com.scb.trade.lcdocchecker.validation;
 
 import com.scb.trade.lcdocchecker.config.ValidationProperties;
+import com.scb.trade.lcdocchecker.domain.DocumentType;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +26,7 @@ import java.util.Locale;
  * data-quality signal ({@link ExtractionValidation}); the caller logs it.
  */
 @Component
-public class InvoiceFieldValidator {
+public class InvoiceFieldValidator implements FieldValidator<InvoiceFields> {
 
     private final ValidationProperties props;
     private final Clock clock;
@@ -35,6 +36,12 @@ public class InvoiceFieldValidator {
         this.clock = clock;
     }
 
+    @Override
+    public DocumentType documentType() {
+        return DocumentType.INVOICE;
+    }
+
+    @Override
     public ExtractionValidation validate(InvoiceFields fields) {
         if (fields == null) {
             return ExtractionValidation.ok();

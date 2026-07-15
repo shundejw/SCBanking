@@ -14,11 +14,15 @@ import com.scb.trade.lcdocchecker.report.ReportAssemblerService;
 import com.scb.trade.lcdocchecker.store.ArtifactStoreService;
 import com.scb.trade.lcdocchecker.store.CheckRunStore;
 import com.scb.trade.lcdocchecker.util.FlowLog;
+import com.scb.trade.lcdocchecker.validation.ExtractionValidation;
+import com.scb.trade.lcdocchecker.validation.FieldValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Coordinates the full pipeline for one check run and persists every intermediate artifact
@@ -42,6 +46,7 @@ public class ComplianceOrchestratorService {
     private final ReportAssemblerService assembler;
     private final ArtifactStoreService artifactStore;
     private final CheckRunStore runStore;
+    private final Map<DocumentType, FieldValidator<?>> validatorsByType;
 
     public ComplianceOrchestratorService(UploadGuardService guard,
                                          LcParserService parser,
@@ -49,7 +54,8 @@ public class ComplianceOrchestratorService {
                                          CheckEngineService engine,
                                          ReportAssemblerService assembler,
                                          ArtifactStoreService artifactStore,
-                                         CheckRunStore runStore) {
+                                         CheckRunStore runStore,
+                                         List<FieldValidator<?>> validators) {
         this.guard = guard;
         this.parser = parser;
         this.extractor = extractor;
@@ -57,6 +63,10 @@ public class ComplianceOrchestratorService {
         this.assembler = assembler;
         this.artifactStore = artifactStore;
         this.runStore = runStore;
+        this.validatorsByType = new HashMap<>();
+        for (FieldValidator<?> v : validators) {
+            this.validatorsByType.put(v.documentType(), v);
+        }
     }
 
     public CheckReport process(String runId, String lcText, byte[] pdfBytes, DocumentType documentType) {
@@ -79,6 +89,7 @@ public class ComplianceOrchestratorService {
                 "stage", "STEP", "runId", runId, "step", "extractDocument", "documentType", documentType);
         ExtractedDocument doc = extractor.extract(pdfBytes, documentType);
         artifactStore.save(runId, documentType.name().toLowerCase() + "_extracted", doc);
+        validateAndStore(runId, doc);
         if (doc.rawText() != null && !doc.rawText().isBlank()) {
             artifactStore.save(runId, "pdf_text", doc.rawText());
         }
@@ -103,6 +114,27 @@ public class ComplianceOrchestratorService {
                 "failedChecks", failCount,
                 "costMs", elapsedMs(startNs));
         return report;
+    }
+
+    private void validateAndStore(String runId, ExtractedDocument doc) {
+        FieldValidator<?> validator = validatorsByType.get(doc.documentType());
+        if (validator == null) {
+            FlowLog.info(log, ComplianceOrchestratorService.class, "process",
+                    "stage", "STEP", "runId", runId, "step", "fieldValidation",
+                    "status", "NO_VALIDATOR", "documentType", doc.documentType());
+            return;
+        }
+        ExtractionValidation validation = invokeValidator(validator, doc);
+        artifactStore.save(runId, "extraction_validation", validation);
+        FlowLog.info(log, ComplianceOrchestratorService.class, "process",
+                "stage", "STEP", "runId", runId, "step", "fieldValidation",
+                "status", validation.status(), "findings", validation.findings().size());
+    }
+
+    /** Heterogeneous-dispatch helper: the registry is keyed by documentType so the raw cast is safe. */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static ExtractionValidation invokeValidator(FieldValidator validator, ExtractedDocument doc) {
+        return validator.validate(doc);
     }
 
     public CheckReport getReport(String runId) {

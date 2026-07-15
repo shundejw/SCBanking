@@ -8,5 +8,8 @@ package com.scb.trade.lcdocchecker.domain;
 public enum DocumentType {
 
     /** Commercial invoice — the initial, fully-implemented document type. */
-    INVOICE
+    INVOICE,
+
+    /** Bill of lading — transport document; extraction-layer support demonstrates extensibility. */
+    BILL_OF_LADING
 }

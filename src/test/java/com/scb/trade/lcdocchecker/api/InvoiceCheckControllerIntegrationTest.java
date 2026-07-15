@@ -91,6 +91,27 @@ class InvoiceCheckControllerIntegrationTest {
         return new MockMultipartFile("invoice", filename, "application/pdf", invoice(filename));
     }
 
+    @Test
+    void extractionValidationArtifactIsExposedAfterCheck() throws Exception {
+        when(invoiceExtractionService.extract(anyString())).thenReturn(mainCompliant());
+
+        MvcResult result = mockMvc.perform(multipart("/checks")
+                        .file(invoicePart("invoice-compliant-digital.pdf"))
+                        .param("lc", lc("SWIFT_MT700_Sample_Compliant.mt700")))
+                .andExpect(status().isOk())
+                .andReturn();
+        String runId = result.getResponse().getHeader("X-Check-Run-Id");
+
+        // mainCompliant() omits invoiceNumber -> InvoiceFieldValidator emits INVOICE_NUMBER_EMPTY (WARN),
+        // proving the registry-driven validator ran in the orchestrator and the artifact is exposed.
+        mockMvc.perform(get("/checks/" + runId + "/artifacts/extraction_validation"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("WARN"))
+                .andExpect(jsonPath("$.findings").isArray())
+                .andExpect(jsonPath("$.findings.length()").value(1))
+                .andExpect(jsonPath("$.findings[0].ruleCode").value("INVOICE_NUMBER_EMPTY"));
+    }
+
     private InvoiceFields mainCompliant() {
         return InvoiceFields.builder()
                 .sellerName("XYZ EXPORT CO., LTD.")
