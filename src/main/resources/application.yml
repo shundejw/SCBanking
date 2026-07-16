@@ -30,11 +30,6 @@ lcchecker:
 
   # Spring AI structured-extraction settings (single source of truth; bridged into spring.ai.openai.*)
   llm:
-    provider: "spring-ai"
-    model-name: "deepseek-v4-flash"
-    base-url: "https://api.deepseek.com"
-    api-key: "${SPRING_AI_API_KEY:}"
-    temperature: 0.0
     timeout: 30s
     prompt-template-path: "classpath:prompts/invoice-extraction-v1.st"
 
