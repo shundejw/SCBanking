@@ -53,3 +53,4 @@ src.zip
 
 # --- Test artifact output ---
 test-artifacts/
+.gstack/

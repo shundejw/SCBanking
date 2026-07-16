@@ -38,7 +38,8 @@ lcchecker:
     timeout: 30s
     prompt-template-path: "classpath:prompts/invoice-extraction-v1.st"
 
-  # Deterministic rule-engine execution order. All checks enabled.
+  # Rule-engine execution order. Eleven invoice checks are enabled; the deterministic
+  # goods-description fallback remains disabled because the LLM check is the default.
   rules:
     enabled:
       - "amount_rule"
