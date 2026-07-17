@@ -9,7 +9,13 @@ import com.scb.trade.lcdocchecker.domain.GoodsDescriptionVerdict;
 import com.scb.trade.lcdocchecker.domain.InvoiceFields;
 import com.scb.trade.lcdocchecker.domain.LcTerms;
 import com.scb.trade.lcdocchecker.rulebook.RuleReference;
+import com.scb.trade.lcdocchecker.util.FlowLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ResponseEntity;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.annotation.Order;
@@ -18,6 +24,7 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -45,6 +52,8 @@ import java.util.concurrent.TimeoutException;
 @Component
 @Order(60)
 public class LlmGoodsDescriptionCheck implements DocumentCheck<InvoiceFields> {
+
+    private static final Logger log = LoggerFactory.getLogger(LlmGoodsDescriptionCheck.class);
 
     static final String FIELD = "goods_description";
     static final String RULE = RuleReference.UCP_600_ART_18_C.ref();
@@ -103,13 +112,35 @@ public class LlmGoodsDescriptionCheck implements DocumentCheck<InvoiceFields> {
 
     /** Calls the LLM with the goods-description prompt. Protected to allow test injection. */
     protected GoodsDescriptionVerdict callLlm(String lcGoods, String invoiceGoods) {
-        return chatClient.prompt()
-                .system(s -> s.text(SafetyPrompts.UNTRUSTED_INPUT_SYSTEM))
-                .user(u -> u.text(promptTemplate)
-                        .param("lcGoods", sanitize(lcGoods))
-                        .param("invoiceGoods", sanitize(invoiceGoods)))
+        String renderedUserPrompt = new PromptTemplate(promptTemplate).render(Map.of(
+                "lcGoods", sanitize(lcGoods),
+                "invoiceGoods", sanitize(invoiceGoods)));
+        FlowLog.info(log, LlmGoodsDescriptionCheck.class, "callLlm",
+                "stage", "LLM_REQUEST",
+                "\ncheckId", checkId(),
+                "\ndocumentType", DocumentType.INVOICE,
+                "\nsystemPrompt", FlowLog.prettyValue(
+                        SafetyPrompts.UNTRUSTED_INPUT_SYSTEM, Integer.MAX_VALUE),
+                "\nuserPromptChars", renderedUserPrompt.length(),
+                "\nuserPrompt", FlowLog.prettyValue(renderedUserPrompt, Integer.MAX_VALUE));
+
+        ResponseEntity<ChatResponse, GoodsDescriptionVerdict> result = chatClient.prompt()
+                .system(SafetyPrompts.UNTRUSTED_INPUT_SYSTEM)
+                .user(renderedUserPrompt)
                 .call()
-                .entity(GoodsDescriptionVerdict.class);
+                .responseEntity(GoodsDescriptionVerdict.class);
+        ChatResponse response = result.response();
+        String responseContent = response == null || response.getResult() == null
+                ? ""
+                : response.getResult().getOutput().getText();
+        FlowLog.info(log, LlmGoodsDescriptionCheck.class, "callLlm",
+                "stage", "LLM_RESPONSE",
+                "\ncheckId", checkId(),
+                "\ndocumentType", DocumentType.INVOICE,
+                "\nresponseChars", responseContent == null ? 0 : responseContent.length(),
+                "\nresponse", FlowLog.prettyValue(responseContent, Integer.MAX_VALUE),
+                "\nmetadata", response == null ? null : response.getMetadata());
+        return result.entity();
     }
 
     private static boolean isBlank(String s) {

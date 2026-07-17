@@ -9,11 +9,15 @@ import com.scb.trade.lcdocchecker.util.FlowLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ResponseEntity;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 /**
  * Spring AI extraction for bills of lading: raw BoL text → {@link BillOfLading} via the fluent
@@ -56,16 +60,37 @@ public class BillOfLadingExtractor implements DocumentExtractor<BillOfLading> {
                 "stage", "START", "inputChars", text == null ? 0 : text.length());
         try {
             String sanitized = sanitize(text);
-            BillOfLadingExtractedData data = chatClient.prompt()
-                    .system(s -> s.text(SafetyPrompts.UNTRUSTED_INPUT_SYSTEM))
-                    .user(u -> u.text(promptTemplate).param("text", sanitized))
+            String renderedUserPrompt = new PromptTemplate(promptTemplate)
+                    .render(Map.of("text", sanitized));
+            FlowLog.info(log, BillOfLadingExtractor.class, "extract",
+                    "stage", "LLM_REQUEST",
+                    "\ndocumentType", DocumentType.BILL_OF_LADING,
+                    "\nsystemPrompt", FlowLog.prettyValue(
+                            SafetyPrompts.UNTRUSTED_INPUT_SYSTEM, Integer.MAX_VALUE),
+                    "\nuserPromptChars", renderedUserPrompt.length(),
+                    "\nuserPrompt", FlowLog.prettyValue(renderedUserPrompt, Integer.MAX_VALUE));
+
+            ResponseEntity<ChatResponse, BillOfLadingExtractedData> result = chatClient.prompt()
+                    .system(SafetyPrompts.UNTRUSTED_INPUT_SYSTEM)
+                    .user(renderedUserPrompt)
                     .call()
-                    .entity(BillOfLadingExtractedData.class);
-            BillOfLading bol = data.toBillOfLading(text);
+                    .responseEntity(BillOfLadingExtractedData.class);
+            ChatResponse response = result.response();
+            String responseContent = response == null || response.getResult() == null
+                    ? ""
+                    : response.getResult().getOutput().getText();
+            FlowLog.info(log, BillOfLadingExtractor.class, "extract",
+                    "stage", "LLM_RESPONSE",
+                    "\ndocumentType", DocumentType.BILL_OF_LADING,
+                    "\nresponseChars", responseContent == null ? 0 : responseContent.length(),
+                    "\nresponse", FlowLog.prettyValue(responseContent, Integer.MAX_VALUE),
+                    "\nmetadata", response == null ? null : response.getMetadata());
+
+            BillOfLading bol = result.entity().toBillOfLading(text);
             FlowLog.info(log, BillOfLadingExtractor.class, "extract",
                     "stage", "END", "result", "success",
-                    "blNumber", bol.blNumber(), "shipper", bol.shipper(),
-                    "costMs", elapsedMs(startNs));
+                    "\nblNumber", bol.blNumber(), "shipper", bol.shipper(),
+                    "\ncostMs", elapsedMs(startNs));
             return bol;
         } catch (Exception e) {
             FlowLog.warn(log, BillOfLadingExtractor.class, "extract",
