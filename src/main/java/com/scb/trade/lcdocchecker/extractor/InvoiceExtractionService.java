@@ -10,12 +10,16 @@ import com.scb.trade.lcdocchecker.util.FlowLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ResponseEntity;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -64,12 +68,31 @@ public class InvoiceExtractionService implements DocumentExtractor<InvoiceFields
                 "stage", "START", "inputChars", text == null ? 0 : text.length(), "timeoutMs", timeout.toMillis());
         Callable<InvoiceFields> task = () -> {
             String sanitizedText = sanitizeInvoiceText(text);
-            InvoiceExtractedData data = chatClient.prompt()
-                    .system(s -> s.text(SafetyPrompts.UNTRUSTED_INPUT_SYSTEM))
-                    .user(u -> u.text(promptTemplate).param("text", sanitizedText))
+            String renderedUserPrompt = new PromptTemplate(promptTemplate)
+                    .render(Map.of("text", sanitizedText));
+            FlowLog.info(log, InvoiceExtractionService.class, "extract",
+                    "stage", "LLM_REQUEST",
+                    "\ndocumentType", DocumentType.INVOICE,
+                    "\nsystemPrompt", FlowLog.prettyValue(
+                            SafetyPrompts.UNTRUSTED_INPUT_SYSTEM, Integer.MAX_VALUE),
+                    "\nuserPromptChars", renderedUserPrompt.length(),
+                    "\nuserPrompt", FlowLog.prettyValue(renderedUserPrompt, Integer.MAX_VALUE));
+            ResponseEntity<ChatResponse, InvoiceExtractedData> result = chatClient.prompt()
+                    .system(SafetyPrompts.UNTRUSTED_INPUT_SYSTEM)
+                    .user(renderedUserPrompt)
                     .call()
-                    .entity(InvoiceExtractedData.class);
-            return data.toFields(text);
+                    .responseEntity(InvoiceExtractedData.class);
+            ChatResponse response = result.response();
+            String responseContent = response == null || response.getResult() == null
+                    ? ""
+                    : response.getResult().getOutput().getText();
+            FlowLog.info(log, InvoiceExtractionService.class, "extract",
+                    "stage", "LLM_RESPONSE",
+                    "\ndocumentType", DocumentType.INVOICE,
+                    "\nresponseChars", responseContent == null ? 0 : responseContent.length(),
+                    "\nresponse", FlowLog.prettyValue(responseContent, Integer.MAX_VALUE),
+                    "\nmetadata", response == null ? null : response.getMetadata());
+            return result.entity().toFields(text);
         };
         try {
             InvoiceFields fields = runWithTimeout(task, timeout);
